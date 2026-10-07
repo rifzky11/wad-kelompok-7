@@ -4,7 +4,7 @@ const navItems = [
   { label: "Home", path: "/" },
   { label: "About", path: "/about" },
   { label: "Services", path: "/services" },
-  { label: "Pricing", path: "/pricing" },
+  { label: "Layanan Medis", path: "/pricing" },
 ];
 
 function Header({ navigate }) {
