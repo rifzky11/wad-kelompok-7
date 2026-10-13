@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 
 const API_URL = "http://localhost:3000";
 
-function LayananMedis() {
+function LayananMedis({ session }) {
+  const isAdmin = session?.role === "admin";
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -161,13 +162,15 @@ function LayananMedis() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={handleOpenCreateModal}
-            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
-          >
-            <span className="text-lg leading-none">+</span> Tambah Layanan
-          </button>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={handleOpenCreateModal}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 active:scale-95"
+            >
+              <span className="text-lg leading-none">+</span> Tambah Layanan
+            </button>
+          )}
         </div>
 
         {/* Notifikasi Toast */}
@@ -226,12 +229,14 @@ function LayananMedis() {
             <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
               Belum ada data layanan di database. Anda dapat menambahkan data layanan baru menggunakan tombol di bawah.
             </p>
-            <button
-              onClick={handleOpenCreateModal}
-              className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
-            >
-              + Tambah Layanan Sekarang
-            </button>
+            {isAdmin && (
+              <button
+                onClick={handleOpenCreateModal}
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+              >
+                + Tambah Layanan Sekarang
+              </button>
+            )}
           </div>
         )}
 
@@ -272,22 +277,24 @@ function LayananMedis() {
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 bg-slate-50/50 p-4 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditModal(service)}
-                    className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-emerald-600"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(service.id, service.title)}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                  >
-                    Hapus
-                  </button>
-                </div>
+                {isAdmin && (
+                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 flex items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditModal(service)}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-emerald-600"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(service.id, service.title)}
+                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                    >
+                      Hapus
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -295,7 +302,7 @@ function LayananMedis() {
       </div>
 
       {/* Modal Tambah / Edit */}
-      {isModalOpen && (
+      {isAdmin && isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl transition-all">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
