@@ -17,15 +17,18 @@ function App() {
     const saved = localStorage.getItem("sehatin-session");
     return saved ? JSON.parse(saved) : null;
   });
+
   const login = (nextSession) => {
     setSession(nextSession);
     localStorage.setItem("sehatin-session", JSON.stringify(nextSession));
   };
+
   const logout = () => {
     setSession(null);
     localStorage.removeItem("sehatin-session");
     navigate("/");
   };
+
   const page =
     path === "/login" ? (
       <Login navigate={navigate} onLogin={login} />
@@ -35,22 +38,29 @@ function App() {
       <Home features={featureData} />
     ) : path === "/dashboard" ? (
       <Login navigate={navigate} onLogin={login} />
-    ) :
-    path === "/about" ? (
-      <About />
+    ) : path === "/about" ? (
+      <About navigate={navigate} />
     ) : path === "/services" ? (
-      <Services />
+      <Services navigate={navigate} />
     ) : path === "/pricing" ? (
-      <Pricing session={session} />
+      <Pricing navigate={navigate} />
     ) : (
-      <Home features={featureData} />
+      <Home features={featureData} navigate={navigate} />
     );
+
   return (
-    <>
-      <Header navigate={navigate} session={session} onLogout={logout} />
-      {page}
-      <Footer />
-    </>
+    <div className="flex min-h-screen flex-col bg-slate-50 text-slate-800 antialiased selection:bg-emerald-500 selection:text-white">
+      <Header
+        navigate={navigate}
+        session={session}
+        onLogout={logout}
+        currentPath={path}
+      />
+      <main className="flex-1">
+        {page}
+      </main>
+      <Footer navigate={navigate} />
+    </div>
   );
 }
 
