@@ -7,7 +7,7 @@ const navItems = [
   { label: "Layanan Medis", path: "/pricing" },
 ];
 
-function Header({ navigate }) {
+function Header({ navigate, session, onLogout }) {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -32,6 +32,16 @@ function Header({ navigate }) {
             </button>
           ))}
         </nav>
+        <div className="hidden items-center gap-3 md:flex">
+          {session ? (
+            <>
+              <button type="button" onClick={() => navigate("/dashboard")} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold capitalize text-emerald-700">{session.role}</button>
+              <button type="button" onClick={onLogout} className="text-sm font-medium text-slate-500 hover:text-red-600">Keluar</button>
+            </>
+          ) : (
+            <button type="button" onClick={() => navigate("/login")} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700">Masuk</button>
+          )}
+        </div>
         <button
           type="button"
           className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-2xl text-slate-700 transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-600 md:hidden"
@@ -57,6 +67,16 @@ function Header({ navigate }) {
                 {item.label}
               </button>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                navigate(session ? "/dashboard" : "/login");
+                setIsOpen(false);
+              }}
+              className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-emerald-700"
+            >
+              {session ? `Dashboard (${session.role})` : "Masuk"}
+            </button>
           </div>
         </nav>
       )}
