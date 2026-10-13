@@ -2,6 +2,25 @@
 
 Dokumentasi rancangan API dan Entity Relationship Diagram (ERD) untuk aplikasi klinik Sehatin.
 
+## Menjalankan aplikasi
+
+Jalankan backend dan frontend dari terminal terpisah:
+
+```bash
+cd backend && npm run dev
+cd frontend && npm run dev
+```
+
+Backend menggunakan `SUPABASE_URL` dan `SUPABASE_ANON_KEY` dari `backend/.env`.
+Sebelum memakai fitur dokter, jadwal, dan pasien, jalankan DDL dari
+`backend/src/schema.js` di Supabase SQL Editor. URL API frontend dapat diubah
+dengan environment variable `VITE_API_URL`.
+
+Halaman `/login` menyediakan empat peran: **Guest**, **Pasien**, **Dokter**, dan
+**Admin**. Guest dapat masuk tanpa akun. Pasien dapat didaftarkan melalui
+Supabase Auth; peran dokter dan admin ditentukan melalui `user_metadata.role`
+saat akun tersebut diprovisikan.
+
 ---
 
 ## 1. API Design

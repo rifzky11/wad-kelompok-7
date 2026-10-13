@@ -39,7 +39,9 @@ function LayananMedis() {
   };
 
   useEffect(() => {
-    fetchServices();
+    queueMicrotask(() => {
+      fetchServices();
+    });
   }, []);
 
   const showNotification = (type, message) => {

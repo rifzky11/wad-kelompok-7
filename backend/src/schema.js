@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS doctors (
   spesialisasi VARCHAR(100) NOT NULL,
   no_sip VARCHAR(100) UNIQUE,
   no_telp VARCHAR(20),
+  image_url TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
