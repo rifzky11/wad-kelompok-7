@@ -28,6 +28,75 @@ function ensureDb(req, res, next) {
   next();
 }
 
+function normalizeRole(role) {
+  const normalizedRole = String(role || "").toLowerCase();
+  const roleAliases = {
+    guest: "guest",
+    patient: "patient",
+    pasien: "patient",
+    doctor: "doctor",
+    dokter: "doctor",
+    admin: "admin",
+  };
+
+  return roleAliases[normalizedRole] || "patient";
+}
+
+async function authenticate(req, res, next) {
+  const authorization = req.get("authorization") || "";
+  const [scheme, token] = authorization.split(" ");
+
+  if (scheme?.toLowerCase() !== "bearer" || !token) {
+    return res.status(401).json({
+      data: null,
+      message: "Autentikasi diperlukan.",
+    });
+  }
+
+  if (!supabase) {
+    return res.status(503).json({
+      data: null,
+      message: "Supabase belum dikonfigurasi.",
+    });
+  }
+
+  let data;
+  let error;
+  try {
+    ({ data, error } = await supabase.auth.getUser(token));
+  } catch (verificationError) {
+    console.error("Failed to verify Supabase access token:", verificationError);
+    return res.status(503).json({
+      data: null,
+      message: "Layanan autentikasi sedang tidak tersedia.",
+    });
+  }
+  if (error || !data.user) {
+    return res.status(401).json({
+      data: null,
+      message: "Sesi tidak valid atau sudah kedaluwarsa.",
+    });
+  }
+
+  req.auth = {
+    user: data.user,
+    role: normalizeRole(data.user.app_metadata?.role),
+  };
+  next();
+}
+
+function allowRoles(...roles) {
+  return (req, res, next) => {
+    if (!req.auth || !roles.includes(req.auth.role)) {
+      return res.status(403).json({
+        data: null,
+        message: "Anda tidak memiliki izin untuk mengakses fitur ini.",
+      });
+    }
+    next();
+  };
+}
+
 // Root test endpoint
 app.get("/", (req, res) => {
   res.status(200).send("API Sehatin is running smoothly!");
@@ -90,7 +159,7 @@ app.get("/api/services/:id", ensureDb, async (req, res) => {
 });
 
 // 3. POST /api/services -> Menambahkan layanan baru
-app.post("/api/services", ensureDb, async (req, res) => {
+app.post("/api/services", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { title, price, image } = req.body;
 
   if (!title || price === undefined) {
@@ -117,7 +186,7 @@ app.post("/api/services", ensureDb, async (req, res) => {
 });
 
 // 4. PUT /api/services/:id -> Mengubah data layanan
-app.put("/api/services/:id", ensureDb, async (req, res) => {
+app.put("/api/services/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { id } = req.params;
   const { title, price, image } = req.body;
 
@@ -158,7 +227,7 @@ app.put("/api/services/:id", ensureDb, async (req, res) => {
 });
 
 // 5. DELETE /api/services/:id -> Menghapus layanan
-app.delete("/api/services/:id", ensureDb, async (req, res) => {
+app.delete("/api/services/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { id } = req.params;
 
   const { data, error } = await supabase
@@ -223,7 +292,7 @@ app.get("/api/doctors/:id/schedules", ensureDb, async (req, res) => {
   res.json({ data, message: "Jadwal dokter berhasil diambil." });
 });
 
-app.post("/api/doctors", ensureDb, async (req, res) => {
+app.post("/api/doctors", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { nama_dokter, spesialisasi, no_sip, no_telp, image_url } = req.body;
   if (!nama_dokter || !spesialisasi) {
     return res.status(400).json({
@@ -241,7 +310,7 @@ app.post("/api/doctors", ensureDb, async (req, res) => {
   res.status(201).json({ data, message: "Dokter berhasil ditambahkan." });
 });
 
-app.put("/api/doctors/:id", ensureDb, async (req, res) => {
+app.put("/api/doctors/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const allowed = ["nama_dokter", "spesialisasi", "no_sip", "no_telp", "image_url"];
   const updatePayload = Object.fromEntries(
     allowed.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]])
@@ -263,7 +332,7 @@ app.put("/api/doctors/:id", ensureDb, async (req, res) => {
   res.json({ data, message: "Data dokter berhasil diperbarui." });
 });
 
-app.post("/api/doctors/:id/schedules", ensureDb, async (req, res) => {
+app.post("/api/doctors/:id/schedules", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { hari, jam_mulai, jam_selesai, kuota = 10 } = req.body;
   if (!hari || !jam_mulai || !jam_selesai) {
     return res.status(400).json({
@@ -281,7 +350,7 @@ app.post("/api/doctors/:id/schedules", ensureDb, async (req, res) => {
   res.status(201).json({ data, message: "Jadwal dokter berhasil ditambahkan." });
 });
 
-app.delete("/api/doctors/:id", ensureDb, async (req, res) => {
+app.delete("/api/doctors/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { data, error } = await supabase
     .from("doctors")
     .delete()
@@ -298,13 +367,13 @@ app.delete("/api/doctors/:id", ensureDb, async (req, res) => {
 // ==========================================
 // C. PASIEN
 // ==========================================
-app.get("/api/patients", ensureDb, async (req, res) => {
+app.get("/api/patients", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { data, error } = await supabase.from("patients").select("*").order("id", { ascending: true });
   if (error) return res.status(500).json({ data: null, message: error.message });
   res.json({ data, message: "Daftar pasien berhasil diambil." });
 });
 
-app.get("/api/patients/:id", ensureDb, async (req, res) => {
+app.get("/api/patients/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { data, error } = await supabase
     .from("patients")
     .select("*, appointments(*)")
@@ -317,7 +386,7 @@ app.get("/api/patients/:id", ensureDb, async (req, res) => {
   res.json({ data, message: "Detail pasien berhasil diambil." });
 });
 
-app.post("/api/patients", ensureDb, async (req, res) => {
+app.post("/api/patients", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const required = ["no_rm", "nik", "nama_lengkap", "jenis_kelamin", "tanggal_lahir"];
   if (required.some((field) => !req.body[field])) {
     return res.status(400).json({ data: null, message: "Data identitas pasien belum lengkap." });
@@ -330,7 +399,7 @@ app.post("/api/patients", ensureDb, async (req, res) => {
   res.status(201).json({ data, message: "Pasien berhasil didaftarkan." });
 });
 
-app.put("/api/patients/:id", ensureDb, async (req, res) => {
+app.put("/api/patients/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const fields = ["no_rm", "nik", "nama_lengkap", "jenis_kelamin", "tanggal_lahir", "no_telp", "alamat"];
   const payload = Object.fromEntries(fields.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]]));
   if (!Object.keys(payload).length) {
@@ -342,7 +411,7 @@ app.put("/api/patients/:id", ensureDb, async (req, res) => {
   res.json({ data, message: "Data pasien berhasil diperbarui." });
 });
 
-app.delete("/api/patients/:id", ensureDb, async (req, res) => {
+app.delete("/api/patients/:id", authenticate, allowRoles("admin"), ensureDb, async (req, res) => {
   const { data, error } = await supabase.from("patients").delete().eq("id", req.params.id).select().single();
   if (error?.code === "PGRST116") return res.status(404).json({ data: null, message: "Pasien tidak ditemukan." });
   if (error) return res.status(500).json({ data: null, message: error.message });
@@ -362,7 +431,7 @@ app.post("/api/auth/login", async (req, res) => {
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return res.status(401).json({ data: null, message: "Email atau password tidak valid." });
-  const userRole = data.user.user_metadata?.role || "patient";
+  const userRole = normalizeRole(data.user.app_metadata?.role);
   res.json({
     data: { role: userRole, user: data.user, session: data.session },
     message: "Login berhasil.",

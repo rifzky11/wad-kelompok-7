@@ -16,10 +16,16 @@ Sebelum memakai fitur dokter, jadwal, dan pasien, jalankan DDL dari
 `backend/src/schema.js` di Supabase SQL Editor. URL API frontend dapat diubah
 dengan environment variable `VITE_API_URL`.
 
-Halaman `/login` menyediakan empat peran: **Guest**, **Pasien**, **Dokter**, dan
-**Admin**. Guest dapat masuk tanpa akun. Pasien dapat didaftarkan melalui
-Supabase Auth; peran dokter dan admin ditentukan melalui `user_metadata.role`
-saat akun tersebut diprovisikan.
+Halaman `/login` menyediakan masuk sebagai Guest, serta masuk dan registrasi
+akun Pasien. API layanan, daftar dokter, dan jadwal dapat dibaca tanpa login.
+Perubahan data layanan/dokter/jadwal dan seluruh akses data pasien hanya untuk
+Admin. Akun Dokter dapat membaca katalog dokter dan jadwal, tetapi belum dapat
+mengelola jadwal karena relasi akun ke data dokter belum tersedia.
+
+Endpoint terlindungi memvalidasi access token Supabase. Peran Admin dan Dokter
+harus diprovisikan pada `app_metadata.role` (`admin` atau `doctor`/`dokter`) oleh
+administrator tepercaya; API tidak memakai `user_metadata.role` untuk memberi
+hak istimewa. Akun tanpa peran terverifikasi diperlakukan sebagai Pasien.
 
 ---
 

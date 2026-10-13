@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 const emptyDoctor = { nama_dokter: "", spesialisasi: "", no_sip: "", no_telp: "" };
@@ -14,25 +14,24 @@ function Dashboard({ session, onLogout }) {
   const [selectedDoctor, setSelectedDoctor] = useState("");
   const [message, setMessage] = useState("");
   const canManageDoctors = session?.role === "admin";
-  const canManagePatients = ["admin", "patient"].includes(session?.role);
+  const canManagePatients = session?.role === "admin";
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      const [doctorResult, patientResult] = await Promise.all([
-        apiRequest("/api/doctors"),
-        apiRequest("/api/patients"),
-      ]);
+      const requests = [apiRequest("/api/doctors")];
+      if (canManagePatients) requests.push(apiRequest("/api/patients"));
+      const [doctorResult, patientResult] = await Promise.all(requests);
       setDoctors(doctorResult.data || []);
-      setPatients(patientResult.data || []);
+      setPatients(patientResult?.data || []);
       setSelectedDoctor((current) => current || String(doctorResult.data?.[0]?.id || ""));
     } catch (loadError) {
       setMessage(loadError.message);
     }
-  };
+  }, [canManagePatients]);
 
   useEffect(() => {
     queueMicrotask(() => { loadData(); });
-  }, []);
+  }, [loadData]);
 
   const submitDoctor = async (event) => {
     event.preventDefault();

@@ -32,8 +32,10 @@ function App() {
   const page =
     path === "/login" ? (
       <Login navigate={navigate} onLogin={login} />
-    ) : path === "/dashboard" && session ? (
+    ) : path === "/dashboard" && session && session.role !== "guest" ? (
       <Dashboard session={session} onLogout={logout} />
+    ) : path === "/dashboard" && session?.role === "guest" ? (
+      <Home features={featureData} />
     ) : path === "/dashboard" ? (
       <Login navigate={navigate} onLogin={login} />
     ) : path === "/about" ? (
