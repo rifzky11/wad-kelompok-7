@@ -1,7 +1,3 @@
-/**
- * Skrip Seeding Data untuk Sehatin
- * Mengisi data awal untuk Services (Layanan Medis)
- */
 const { supabase } = require("./db");
 
 const initialServices = [
@@ -55,7 +51,6 @@ async function seedData() {
 
   console.log("Memulai seeding data 'services'...");
 
-  // Cek apakah data sudah ada
   const { data: existing, error: checkError } = await supabase
     .from("services")
     .select("id")

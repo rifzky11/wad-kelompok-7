@@ -32,9 +32,16 @@ function Login({ navigate, onLogin }) {
       );
 
       if (isRegistering) {
-        setSuccess(`${result.message} Silakan masuk ke akun Anda.`);
-        setIsRegistering(false);
-        setForm((current) => ({ ...current, nama_lengkap: "" }));
+        if (result.data?.session) {
+          onLogin(result.data);
+          navigate("/dashboard");
+        } else {
+          setSuccess(
+            "Akun berhasil dibuat. Cek email Anda dan klik tautan konfirmasi sebelum masuk.",
+          );
+          setIsRegistering(false);
+          setForm((current) => ({ ...current, nama_lengkap: "" }));
+        }
       } else {
         onLogin(result.data);
         navigate("/dashboard");

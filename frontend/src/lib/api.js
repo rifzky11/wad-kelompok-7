@@ -15,7 +15,10 @@ export async function apiRequest(path, options = {}) {
   });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(body.message || "Terjadi kesalahan pada server.");
+    const error = new Error(body.message || "Terjadi kesalahan pada server.");
+    error.status = response.status;
+    error.code = body.code;
+    throw error;
   }
   return body;
 }

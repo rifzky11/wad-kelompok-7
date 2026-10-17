@@ -3,7 +3,6 @@ import { useState } from "react";
 import About from "./pages/About";
 import Home from "./pages/Home";
 import Pricing from "./pages/Pricing";
-import Services from "./pages/Services";
 import Header from "./components/Header";
 import Footer from "./components/Footer";
 import { featureData } from "./data/features";
@@ -15,7 +14,10 @@ function App() {
   const [path, navigate] = usePath();
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("sehatin-session");
-    return saved ? JSON.parse(saved) : null;
+    const parsed = saved ? JSON.parse(saved) : null;
+    return ["guest", "patient", "doctor", "admin"].includes(parsed?.role)
+      ? parsed
+      : null;
   });
 
   const login = (nextSession) => {
@@ -40,10 +42,8 @@ function App() {
       <Login navigate={navigate} onLogin={login} />
     ) : path === "/about" ? (
       <About navigate={navigate} />
-    ) : path === "/services" ? (
-      <Services navigate={navigate} />
     ) : path === "/pricing" ? (
-      <Pricing navigate={navigate} />
+      <Pricing navigate={navigate} session={session} />
     ) : (
       <Home features={featureData} navigate={navigate} />
     );
