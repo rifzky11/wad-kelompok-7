@@ -2,7 +2,6 @@ function Footer({ navigate }) {
   const links = [
     { label: "Home", path: "/" },
     { label: "About", path: "/about" },
-    { label: "Services", path: "/services" },
     { label: "Layanan Medis", path: "/pricing" },
     { label: "Login / Portal", path: "/login" },
   ];
