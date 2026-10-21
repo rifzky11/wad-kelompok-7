@@ -1,6 +1,6 @@
 const express = require("express");
-const crypto = require("crypto");
 const { supabaseAdmin, authenticate, allowRoles } = require("../middleware/auth");
+const { uploadServiceImage } = require("../utils/s3");
 
 const router = express.Router();
 
@@ -14,66 +14,6 @@ function respondWithSchemaError(res, error) {
       error.message,
   });
   return true;
-}
-
-async function ensureServicesBucket() {
-  const { data: buckets, error: listError } =
-    await supabaseAdmin.storage.listBuckets();
-
-  if (listError) throw listError;
-
-  const servicesBucket = buckets?.find((bucket) => bucket.name === "services");
-  if (servicesBucket) {
-    if (!servicesBucket.public) {
-      const { error: updateError } = await supabaseAdmin.storage.updateBucket(
-        "services",
-        { public: true },
-      );
-      if (updateError) throw updateError;
-    }
-    return;
-  }
-
-  const { error: createError } = await supabaseAdmin.storage.createBucket(
-    "services",
-    {
-      public: true,
-      fileSizeLimit: "8MB",
-      allowedMimeTypes: ["image/jpeg", "image/png", "image/webp"],
-    },
-  );
-
-  if (createError && !createError.message?.toLowerCase().includes("already exists")) {
-    throw createError;
-  }
-}
-
-async function uploadServiceImage(imageData) {
-  if (!imageData) return null;
-
-  const match = imageData.match(/^data:(image\/(?:jpeg|png|webp));base64,(.+)$/);
-  if (!match) {
-    const error = new Error("Foto harus berupa JPG, PNG, atau WEBP.");
-    error.status = 400;
-    throw error;
-  }
-
-  const [, contentType, encodedImage] = match;
-  const extension = contentType.split("/")[1].replace("jpeg", "jpg");
-  const filePath = `services/${crypto.randomUUID()}.${extension}`;
-
-  await ensureServicesBucket();
-
-  const { error } = await supabaseAdmin.storage
-    .from("services")
-    .upload(filePath, Buffer.from(encodedImage, "base64"), {
-      contentType,
-      upsert: false,
-    });
-
-  if (error) throw error;
-  const { data } = supabaseAdmin.storage.from("services").getPublicUrl(filePath);
-  return data.publicUrl;
 }
 
 const getAllServices = async (req, res) => {
