@@ -2,43 +2,59 @@ const { supabase } = require("./db");
 
 const initialServices = [
   {
-    title: "Pemeriksaan Dokter Umum",
+    title: "Pemeriksaan Umum",
     price: 60000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?auto=format&fit=crop&w=600&q=80",
   },
   {
-    title: "Konsultasi Dokter Gigi",
+    title: "Konsultasi Gigi",
     price: 120000,
+    kuota: 10,
+    category: "konsultasi",
     image: "https://images.unsplash.com/photo-1588776814546-1ffcf47267a5?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Pemeriksaan Kesehatan Anak",
     price: 90000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Laboratorium Darah Lengkap",
     price: 150000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1579154204601-01588f351e67?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Vaksinasi & Imunisasi",
     price: 175000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1584515933487-779824d29309?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Fisioterapi & Rehabilitasi Medis",
     price: 130000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Pemeriksaan USG & Kebidanan",
     price: 200000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1516549655169-df83a0774514?auto=format&fit=crop&w=600&q=80",
   },
   {
     title: "Medical Check Up Dasar",
     price: 250000,
+    kuota: 10,
+    category: "pemeriksaan",
     image: "https://images.unsplash.com/photo-1505751172876-fa1923c5c528?auto=format&fit=crop&w=600&q=80",
   },
 ];

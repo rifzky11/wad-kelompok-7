@@ -4,6 +4,18 @@ const { supabaseAdmin, authenticate, allowRoles } = require("../middleware/auth"
 
 const router = express.Router();
 
+function respondWithSchemaError(res, error) {
+  if (error?.code !== "PGRST204") return false;
+
+  res.status(500).json({
+    data: null,
+    message:
+      "Schema tabel services belum terbaca oleh Supabase API. Pastikan kolom category dan kuota sudah ada, lalu jalankan NOTIFY pgrst, 'reload schema'; di Supabase SQL Editor. Detail: " +
+      error.message,
+  });
+  return true;
+}
+
 async function ensureServicesBucket() {
   const { data: buckets, error: listError } =
     await supabaseAdmin.storage.listBuckets();
@@ -71,13 +83,7 @@ const getAllServices = async (req, res) => {
     .order("id", { ascending: true });
 
   if (error) {
-    if (error.code === "PGRST204") {
-      return res.status(500).json({
-        data: null,
-        message:
-          "Kolom category belum ada di tabel services. Jalankan migrasi ALTER TABLE public.services ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'lainnya'; di Supabase SQL Editor.",
-      });
-    }
+    if (respondWithSchemaError(res, error)) return;
     return res.status(500).json({ data: null, message: error.message });
   }
 
@@ -116,12 +122,18 @@ router.get("/api/services/:id", async (req, res) => {
 });
 
 router.post("/api/services", authenticate, allowRoles("admin"), async (req, res) => {
-  const { title, price, image_data: imageData, category } = req.body;
+  const { title, price, image_data: imageData, category, kuota } = req.body;
 
-  if (!title || price === undefined) {
+  if (
+    !title ||
+    price === undefined ||
+    kuota === undefined ||
+    !Number.isInteger(Number(kuota)) ||
+    Number(kuota) < 0
+  ) {
     return res.status(400).json({
       data: null,
-      message: "Field 'title' dan 'price' wajib diisi.",
+      message: "Field 'title', 'price', dan 'kuota' wajib diisi.",
     });
   }
 
@@ -137,18 +149,12 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
   const { data, error } = await supabaseAdmin
     .from("services")
-    .insert([{ title, price, image, category: category || "lainnya" }])
+    .insert([{ title, price, kuota, image, category: category || "lainnya" }])
     .select()
     .single();
 
   if (error) {
-    if (error.code === "PGRST204") {
-      return res.status(500).json({
-        data: null,
-        message:
-          "Kolom category belum ada di tabel services. Jalankan migrasi ALTER TABLE public.services ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'lainnya'; di Supabase SQL Editor.",
-      });
-    }
+    if (respondWithSchemaError(res, error)) return;
     return res.status(500).json({ data: null, message: error.message });
   }
 
@@ -160,9 +166,9 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
 router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, res) => {
   const { id } = req.params;
-  const { title, price, image_data: imageData, category } = req.body;
+  const { title, price, image_data: imageData, category, kuota } = req.body;
 
-  if (!title && price === undefined && imageData === undefined && category === undefined) {
+  if (!title && price === undefined && imageData === undefined && category === undefined && kuota === undefined) {
     return res.status(400).json({
       data: null,
       message: "Setidaknya salah satu field (title, price, image) harus diisi untuk update.",
@@ -173,6 +179,15 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
   if (title !== undefined) updatePayload.title = title;
   if (price !== undefined) updatePayload.price = price;
   if (category !== undefined) updatePayload.category = category;
+  if (kuota !== undefined) {
+    if (!Number.isInteger(Number(kuota)) || Number(kuota) < 0) {
+      return res.status(400).json({
+        data: null,
+        message: "Kuota harus berupa bilangan bulat nol atau lebih.",
+      });
+    }
+    updatePayload.kuota = kuota;
+  }
 
   if (imageData !== undefined) {
     try {
@@ -193,13 +208,7 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
     .single();
 
   if (error) {
-    if (error.code === "PGRST204") {
-      return res.status(500).json({
-        data: null,
-        message:
-          "Kolom category belum ada di tabel services. Jalankan migrasi ALTER TABLE public.services ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'lainnya'; di Supabase SQL Editor.",
-      });
-    }
+    if (respondWithSchemaError(res, error)) return;
     return res.status(500).json({ data: null, message: error.message });
   }
 

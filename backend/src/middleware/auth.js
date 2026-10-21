@@ -17,7 +17,6 @@ function normalizeRole(role) {
   const roleAliases = {
     guest: "guest",
     patient: "patient",
-    doctor: "doctor",
     admin: "admin",
   };
 

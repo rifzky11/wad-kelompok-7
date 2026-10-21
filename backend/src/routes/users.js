@@ -20,41 +20,18 @@ router.get("/api/users", authenticate, allowRoles("admin"), async (req, res) => 
   if (error) return res.status(500).json({ data: null, message: error.message });
 
   const users = data || [];
-  const userIds = users.map((user) => user.id);
-  let doctorsByUserId = new Map();
-
-  if (userIds.length) {
-    const { data: doctors, error: doctorsError } = await supabaseAdmin
-      .from("doctors")
-      .select("id, user_id, nama_dokter, spesialisasi")
-      .in("user_id", userIds);
-
-    if (doctorsError && doctorsError.code !== "PGRST205") {
-      return res.status(500).json({ data: null, message: doctorsError.message });
-    }
-
-    doctorsByUserId = new Map(
-      (doctors || []).map((doctor) => [doctor.user_id, doctor]),
-    );
-  }
-
   res.json({
-    data: users.map((user) => ({
-      ...user,
-      doctors: doctorsByUserId.get(user.id)
-        ? [doctorsByUserId.get(user.id)]
-        : [],
-    })),
+    data: users,
     message: "Daftar pengguna berhasil diambil.",
   });
 });
 
 router.patch("/api/users/:id/role", authenticate, allowRoles("admin"), async (req, res) => {
   const { role } = req.body;
-  if (!["patient", "doctor", "admin"].includes(role)) {
+  if (!["patient", "admin"].includes(role)) {
     return res.status(400).json({
       data: null,
-      message: "Role harus patient, doctor, atau admin.",
+      message: "Role harus patient atau admin.",
     });
   }
 

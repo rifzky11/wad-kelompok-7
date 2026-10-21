@@ -12,14 +12,14 @@ function Home({ features = [], navigate }) {
     },
     {
       num: "02",
-      title: "Pilih Jadwal",
-      desc: "Tentukan hari dan jam konsultasi dokter spesialis tanpa perlu mengantre pagi.",
+      title: "Pilih Layanan",
+      desc: "Pilih pemeriksaan atau konsultasi sesuai kebutuhan Anda.",
       icon: "📅",
     },
     {
       num: "03",
-      title: "Pemeriksaan Dokter",
-      desc: "Konsultasi tatap muka intensif dengan diagnosa menyeluruh dan penuh empati.",
+      title: "Pemeriksaan",
+      desc: "Dapatkan pemeriksaan menyeluruh dengan proses yang tertata.",
       icon: "🩺",
     },
     {
@@ -35,14 +35,14 @@ function Home({ features = [], navigate }) {
       name: "Siti Rahmawati",
       role: "Pasien Konsultasi Umum",
       comment:
-        "Pelayanannya sangat ramah dan tempatnya bersih. Reservasi via website langsung dapat jadwal tanpa nunggu lama di ruang tunggu.",
+        "Pelayanannya sangat ramah dan tempatnya bersih. Reservasi via website mudah dan cepat.",
       rating: "★★★★★",
     },
     {
       name: "Budi Santoso",
       role: "Kepala Keluarga • Poli Gigi",
       comment:
-        "Dokter gigi di Sehatin teliti dan anak saya sama sekali tidak takut saat periksa. Penjelasan biaya dan tindakan juga sangat transparan.",
+        "Layanan gigi di Sehatin teliti dan anak saya sama sekali tidak takut saat periksa. Penjelasan biaya dan tindakan juga sangat transparan.",
       rating: "★★★★★",
     },
     {
@@ -226,10 +226,10 @@ function Home({ features = [], navigate }) {
               KESEHATAN ADALAH PRIORITAS
             </span>
             <h2 className="mt-4 text-3xl font-extrabold sm:text-4xl">
-              Siap Menjadwalkan Pemeriksaan Kesehatan Anda?
+              Siap Mendaftar Pemeriksaan Kesehatan Anda?
             </h2>
             <p className="mt-4 text-base text-emerald-100 sm:text-lg">
-              Konsultasikan keluhan Anda bersama dokter ahli kami sekarang.
+              Pilih layanan medis yang sesuai dengan kebutuhan Anda sekarang.
               Nikmati kenyamanan berobat tanpa antre panjang.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-4">
@@ -238,7 +238,7 @@ function Home({ features = [], navigate }) {
                 onClick={() => navigate?.("/pricing")}
                 className="rounded-xl bg-white px-6 py-3.5 text-sm font-bold text-emerald-800 shadow-md transition hover:bg-emerald-50 active:scale-95"
               >
-                Pilih Layanan & Jadwal
+                Pilih Layanan
               </button>
               <button
                 type="button"

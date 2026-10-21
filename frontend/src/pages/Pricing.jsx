@@ -8,8 +8,6 @@ function LayananMedis({ session }) {
   const [error, setError] = useState("");
   const [notification, setNotification] = useState({ type: "", message: "" });
   const [selectedService, setSelectedService] = useState(null);
-  const [doctors, setDoctors] = useState([]);
-  const [isLoadingDoctors, setIsLoadingDoctors] = useState(false);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,14 +16,11 @@ function LayananMedis({ session }) {
   const [formData, setFormData] = useState({
     title: "",
     price: "",
+    kuota: 10,
     image: "",
     category: "lainnya",
   });
   const [imageFile, setImageFile] = useState(null);
-  const isConsultation = (service) =>
-    service.category === "konsultasi" ||
-    service.title?.toLowerCase().includes("konsultasi");
-
   // Fetch daftar layanan
   const fetchServices = async () => {
     try {
@@ -59,6 +54,7 @@ function LayananMedis({ session }) {
     setFormData({
       title: "",
       price: "",
+      kuota: 10,
       image: "",
       category: "lainnya",
     });
@@ -72,6 +68,7 @@ function LayananMedis({ session }) {
     setFormData({
       title: service.title,
       price: service.price,
+      kuota: service.kuota ?? 10,
       image: service.image || "",
       category: service.category || "lainnya",
     });
@@ -82,8 +79,12 @@ function LayananMedis({ session }) {
   // Submit modal (Create or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.price) {
-      alert("Nama layanan dan tarif wajib diisi!");
+    if (
+      !formData.title ||
+      !formData.price ||
+      formData.kuota < 0
+    ) {
+      alert("Nama layanan, tarif, dan kuota harus diisi dengan benar!");
       return;
     }
 
@@ -105,6 +106,7 @@ function LayananMedis({ session }) {
         body: JSON.stringify({
           title: formData.title,
           price: Number(formData.price),
+          kuota: Number(formData.kuota),
           category: formData.category,
           ...(imageData ? { image_data: imageData } : {}),
         }),
@@ -147,17 +149,6 @@ function LayananMedis({ session }) {
 
   const openService = async (service) => {
     setSelectedService(service);
-    if (!isConsultation(service)) return;
-
-    try {
-      setIsLoadingDoctors(true);
-      const result = await apiRequest("/api/doctors");
-      setDoctors(result.data || []);
-    } catch (loadError) {
-      showNotification("error", loadError.message);
-    } finally {
-      setIsLoadingDoctors(false);
-    }
   };
 
   return (
@@ -289,6 +280,11 @@ function LayananMedis({ session }) {
                     <p className="mt-2 text-xl font-black text-emerald-600">
                       Rp {Number(service.price).toLocaleString("id-ID")}
                     </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-600">
+                      {service.category === "obat"
+                        ? `Stok tersedia: ${service.kuota ?? 0}`
+                        : `Kuota tersedia: ${service.kuota ?? 0}`}
+                    </p>
                   </div>
                 </div>
 
@@ -342,6 +338,22 @@ function LayananMedis({ session }) {
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  {formData.category === "obat" ? "Stok obat *" : "Kuota layanan *"}
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.kuota}
+                  onChange={(e) =>
+                    setFormData({ ...formData, kuota: e.target.value })
+                  }
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                   Kategori *
                 </label>
                 <select
@@ -365,7 +377,7 @@ function LayananMedis({ session }) {
                 <input
                   type="text"
                   required
-                  placeholder="Contoh: Pemeriksaan Dokter Umum"
+                  placeholder="Contoh: Pemeriksaan Umum"
                   value={formData.title}
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
@@ -461,39 +473,18 @@ function LayananMedis({ session }) {
                 &times;
               </button>
             </div>
-            {isConsultation(selectedService) ? (
-              <div className="mt-6">
-                <h3 className="font-semibold text-slate-900">Jadwal dokter</h3>
-                {isLoadingDoctors ? (
-                  <p className="mt-3 text-sm text-slate-500">Memuat jadwal...</p>
-                ) : doctors.length ? (
-                  <div className="mt-3 space-y-2">
-                    {doctors.map((doctor) => (
-                      <div key={doctor.id} className="rounded-lg bg-slate-50 p-3">
-                        <p className="font-semibold">{doctor.nama_dokter}</p>
-                        <p className="text-sm text-slate-500">
-                          {doctor.spesialisasi}
-                        </p>
-                        {doctor.doctor_schedules?.map((schedule) => (
-                          <p key={schedule.id} className="mt-1 text-sm text-emerald-700">
-                            {schedule.hari}, {String(schedule.jam_mulai).slice(0, 5)}–
-                            {String(schedule.jam_selesai).slice(0, 5)}
-                          </p>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-3 text-sm text-slate-500">
-                    Jadwal dokter belum tersedia.
-                  </p>
-                )}
-              </div>
-            ) : (
-              <p className="mt-6 text-sm text-slate-600">
-                Layanan ini tidak membutuhkan pemilihan jadwal dokter.
-              </p>
-            )}
+            <p className="mt-6 text-sm text-slate-600">
+              {selectedService.category === "obat" ? (
+                <>
+                  Stok tersedia: <strong>{selectedService.kuota ?? 0}</strong>.
+                </>
+              ) : (
+                <>
+                  Kuota tersedia: <strong>{selectedService.kuota ?? 0}</strong>.
+                </>
+              )}{" "}
+              Silakan hubungi admin untuk informasi lebih lanjut.
+            </p>
           </div>
         </div>
       )}

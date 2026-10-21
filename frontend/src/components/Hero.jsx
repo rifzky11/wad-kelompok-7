@@ -30,7 +30,7 @@ function Hero({ navigate }) {
 
             <p className="mt-5 text-base leading-relaxed text-slate-600 sm:text-lg">
               Sehatin hadir memberikan layanan medis komprehensif, mulai dari
-              konsultasi umum, dokter gigi, hingga pemeriksaan rutin. Reservasi
+              konsultasi umum, pemeriksaan gigi, hingga pemeriksaan rutin. Reservasi
               mudah tanpa antre panjang dengan rekam medis terpadu.
             </p>
 
@@ -41,7 +41,7 @@ function Hero({ navigate }) {
                 onClick={updateCount}
                 className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-emerald-600/25 transition-all hover:bg-emerald-700 active:scale-95"
               >
-                <span>Jadwalkan Kunjungan : {count}</span>
+                <span>Daftar Kunjungan : {count}</span>
               </button>
 
               <button
@@ -62,7 +62,7 @@ function Hero({ navigate }) {
               </div>
               <div>
                 <p className="text-2xl font-bold text-slate-900">10+</p>
-                <p className="text-xs font-medium text-slate-500">Dokter Ber-SIP</p>
+                <p className="text-xs font-medium text-slate-500">Layanan Terverifikasi</p>
               </div>
               <div>
                 <p className="text-2xl font-bold text-emerald-600">4.9 / 5.0</p>
@@ -86,7 +86,7 @@ function Hero({ navigate }) {
                   🩺
                 </div>
                 <div>
-                  <p className="text-xs font-bold text-slate-900">Dokter Siaga</p>
+                  <p className="text-xs font-bold text-slate-900">Layanan Siaga</p>
                   <p className="text-[11px] text-slate-500">Konsultasi Ramah & Tepat</p>
                 </div>
               </div>

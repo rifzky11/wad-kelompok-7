@@ -66,6 +66,11 @@ function Services() {
           <p className="mt-2 text-lg font-bold text-emerald-600">
             Rp {service.price.toLocaleString("id-ID")}
           </p>
+          <p className="mt-2 text-sm font-semibold text-slate-600">
+            {service.category === "obat"
+              ? `Stok tersedia: ${service.kuota ?? 0}`
+              : `Kuota tersedia: ${service.kuota ?? 0}`}
+          </p>
         </article>
       ))}
     </main>
