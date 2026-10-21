@@ -5,15 +5,22 @@ const { uploadServiceImage } = require("../utils/s3");
 const router = express.Router();
 
 function respondWithSchemaError(res, error) {
-  if (error?.code !== "PGRST204") return false;
+  // PGRST204: kolom tidak dikenal PostgREST; 42703: kolom belum ada di PostgreSQL.
+  if (error?.code !== "PGRST204" && error?.code !== "42703") return false;
 
   res.status(500).json({
     data: null,
     message:
-      "Schema tabel services belum terbaca oleh Supabase API. Pastikan kolom category dan kuota sudah ada, lalu jalankan NOTIFY pgrst, 'reload schema'; di Supabase SQL Editor. Detail: " +
+      "Kolom description belum ada di tabel services. Jalankan perintah berikut di Supabase SQL Editor: ALTER TABLE public.services ADD COLUMN IF NOT EXISTS description TEXT; NOTIFY pgrst, 'reload schema'; lalu simpan ulang layanan. Detail: " +
       error.message,
   });
   return true;
+}
+
+function normalizeDescription(description) {
+  if (description === undefined || description === null) return null;
+  const value = String(description).trim();
+  return value ? value : null;
 }
 
 const getAllServices = async (req, res) => {
@@ -62,7 +69,8 @@ router.get("/api/services/:id", async (req, res) => {
 });
 
 router.post("/api/services", authenticate, allowRoles("admin"), async (req, res) => {
-  const { title, price, image_data: imageData, category, kuota } = req.body;
+  const { title, price, image_data: imageData, category, kuota, description } =
+    req.body;
 
   if (
     !title ||
@@ -74,6 +82,17 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
     return res.status(400).json({
       data: null,
       message: "Field 'title', 'price', dan 'kuota' wajib diisi.",
+    });
+  }
+
+  if (
+    description !== undefined &&
+    description !== null &&
+    typeof description !== "string"
+  ) {
+    return res.status(400).json({
+      data: null,
+      message: "Deskripsi layanan harus berupa teks.",
     });
   }
 
@@ -89,7 +108,16 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
   const { data, error } = await supabaseAdmin
     .from("services")
-    .insert([{ title, price, kuota, image, category: category || "lainnya" }])
+    .insert([
+      {
+        title,
+        price,
+        kuota,
+        image,
+        category: category || "lainnya",
+        description: normalizeDescription(description),
+      },
+    ])
     .select()
     .single();
 
@@ -106,12 +134,32 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
 router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, res) => {
   const { id } = req.params;
-  const { title, price, image_data: imageData, category, kuota } = req.body;
+  const { title, price, image_data: imageData, category, kuota, description } =
+    req.body;
 
-  if (!title && price === undefined && imageData === undefined && category === undefined && kuota === undefined) {
+  if (
+    !title &&
+    price === undefined &&
+    imageData === undefined &&
+    category === undefined &&
+    kuota === undefined &&
+    description === undefined
+  ) {
     return res.status(400).json({
       data: null,
-      message: "Setidaknya salah satu field (title, price, image) harus diisi untuk update.",
+      message:
+        "Setidaknya salah satu field (title, price, image, category, kuota, description) harus diisi untuk update.",
+    });
+  }
+
+  if (
+    description !== undefined &&
+    description !== null &&
+    typeof description !== "string"
+  ) {
+    return res.status(400).json({
+      data: null,
+      message: "Deskripsi layanan harus berupa teks.",
     });
   }
 
@@ -119,6 +167,9 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
   if (title !== undefined) updatePayload.title = title;
   if (price !== undefined) updatePayload.price = price;
   if (category !== undefined) updatePayload.category = category;
+  if (description !== undefined) {
+    updatePayload.description = normalizeDescription(description);
+  }
   if (kuota !== undefined) {
     if (!Number.isInteger(Number(kuota)) || Number(kuota) < 0) {
       return res.status(400).json({
