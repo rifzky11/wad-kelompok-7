@@ -17,20 +17,41 @@ function respondWithSchemaError(res, error) {
 }
 
 const getAllServices = async (req, res) => {
-  const { data, error } = await supabaseAdmin
-    .from("services")
-    .select("*")
-    .order("id", { ascending: true });
+  try {
+    // 1. Tangkap page & limit dengan fallback aman
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 8);
 
-  if (error) {
-    if (respondWithSchemaError(res, error)) return;
-    return res.status(500).json({ data: null, message: error.message });
+    // 2. Hitung offset Supabase
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    // 3. Query ambil data + total jumlah data
+    const { data, error, count } = await supabaseAdmin
+      .from("services")
+      .select("*", { count: "exact" })
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      if (respondWithSchemaError(res, error)) return;
+      return res.status(500).json({ data: null, message: error.message });
+    }
+
+    // 4. Kirim respons
+    res.status(200).json({
+      data,
+      meta: {
+        currentPage: page,
+        limit: limit,
+        totalData: count || 0,
+        totalPages: Math.ceil((count || 0) / limit) || 1, // Pastikan minimal ada 1 halaman
+      },
+      message: "Daftar layanan berhasil diambil.",
+    });
+  } catch (err) {
+    res.status(500).json({ data: null, message: "Terjadi kesalahan server internal." });
   }
-
-  res.status(200).json({
-    data,
-    message: "Daftar layanan berhasil diambil.",
-  });
 };
 
 router.get("/services", getAllServices);
@@ -79,7 +100,7 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
   let image;
   try {
-    image = await uploadServiceImage(imageData);
+    if (imageData) image = await uploadServiceImage(imageData);
   } catch (error) {
     return res.status(error.status || 500).json({
       data: null,
