@@ -15,7 +15,7 @@ function App() {
   const [session, setSession] = useState(() => {
     const saved = localStorage.getItem("sehatin-session");
     const parsed = saved ? JSON.parse(saved) : null;
-    return ["guest", "patient", "doctor", "admin"].includes(parsed?.role)
+    return ["guest", "patient", "admin"].includes(parsed?.role)
       ? parsed
       : null;
   });

@@ -23,7 +23,7 @@ function Footer({ navigate }) {
               Sehatin<span className="text-emerald-500">.</span>
             </span>
             <p className="mt-3 text-xs leading-relaxed text-slate-400">
-              Klinik kesehatan keluarga modern dengan pelayanan prima, dokter
+              Klinik kesehatan keluarga modern dengan pelayanan prima dan
               berpengalaman, dan sistem informasi rekam medis digital terpadu.
             </p>
             <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-800/80 px-3 py-1.5 text-xs text-emerald-400">

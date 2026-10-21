@@ -3,7 +3,7 @@ function About({ navigate }) {
     {
       icon: "🩺",
       title: "Profesionalisme Medis",
-      desc: "Seluruh dokter dan tenaga kesehatan mengantongi Surat Izin Praktik (SIP) resmi dengan rekam jejak klinis yang teruji.",
+      desc: "Seluruh layanan kesehatan kami dikelola dengan standar operasional yang teruji.",
     },
     {
       icon: "🤝",
@@ -86,7 +86,7 @@ function About({ navigate }) {
 
           <p className="mt-6 text-base leading-relaxed text-slate-600 sm:text-lg">
             Sehatin adalah klinik kesehatan keluarga modern yang mengintegrasikan
-            keunggulan klinis dokter berpengalaman dengan kemudahan teknologi
+            keunggulan layanan kesehatan dengan kemudahan teknologi
             digital. Kami percaya setiap individu dan keluarga berhak
             memperoleh perawatan kesehatan yang manusiawi, berkualitas, dan transparan.
           </p>
@@ -103,7 +103,7 @@ function About({ navigate }) {
           <div className="text-center">
             <p className="text-3xl font-extrabold text-slate-900">10+</p>
             <p className="mt-1 text-xs font-semibold text-slate-500">
-              Dokter Berpengalaman
+              Layanan Terpercaya
             </p>
           </div>
           <div className="text-center">
@@ -200,7 +200,7 @@ function About({ navigate }) {
                   </span>
                   <span>
                     Membina komunikasi terapeutik yang edukatif, empatik, dan
-                    ramah antara dokter, tenaga medis, dan keluarga pasien.
+                    ramah antara tenaga medis dan keluarga pasien.
                   </span>
                 </li>
               </ul>
@@ -303,7 +303,7 @@ function About({ navigate }) {
       {/* 5. Informasi Operasional & Kontak */}
       <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-8 md:grid-cols-2">
-          {/* Jadwal Operasional */}
+          {/* Jam Operasional */}
           <div className="rounded-3xl border border-slate-200 bg-white p-8 shadow-xs">
             <div className="flex items-center gap-3">
               <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-xl">

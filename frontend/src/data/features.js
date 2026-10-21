@@ -3,12 +3,12 @@ export const featureData = [
     id: "1",
     icon: "⚕️",
     title: "Mudah Digunakan",
-    subtitle: "Buat jadwal konsultasi tanpa proses yang rumit.",
+    subtitle: "Daftar konsultasi tanpa proses yang rumit.",
   },
   {
     id: "2",
     icon: "🩺",
-    title: "Dokter Berpengalaman",
+    title: "Layanan Terpercaya",
     subtitle: "Dapatkan perawatan dari tenaga medis terpercaya.",
   },
   {
