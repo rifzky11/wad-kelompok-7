@@ -6,6 +6,7 @@ const servicesRoutes = require("./routes/services");
 const patientsRoutes = require("./routes/patients");
 const usersRoutes = require("./routes/users");
 const authRoutes = require("./routes/auth");
+const appointmentsRoutes = require("./routes/appointments");
 
 dotenv.config();
 
@@ -19,12 +20,13 @@ app.get("/", (req, res) => {
   res.status(200).send("API Sehatin is running smoothly!");
 });
 
-app.use(["/services", "/api/services", "/api/patients", "/api/users"], ensureDb);
+app.use(["/services", "/api/services", "/api/patients", "/api/users", "/api/appointments"], ensureDb);
 
 app.use(servicesRoutes);
 app.use(patientsRoutes);
 app.use(usersRoutes);
 app.use(authRoutes);
+app.use(appointmentsRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
