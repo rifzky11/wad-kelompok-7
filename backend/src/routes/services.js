@@ -1,30 +1,51 @@
 const express = require("express");
-const { supabaseAdmin, authenticate, allowRoles } = require("../middleware/auth");
-const { uploadServiceImage } = require("../utils/s3");
+const { supabase, authenticate, allowRoles } = require("../middleware/auth");
 
 const router = express.Router();
 
+function normalizeImageUrl(value) {
+  if (value === undefined || value === null || value === "") return null;
+  if (typeof value !== "string") {
+    const error = new Error("URL gambar harus berupa teks.");
+    error.status = 400;
+    throw error;
+  }
+
+  const imageUrl = value.trim();
+  if (!imageUrl) return null;
+
+  try {
+    const parsedUrl = new URL(imageUrl);
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      throw new Error("URL gambar harus menggunakan protokol HTTP atau HTTPS.");
+    }
+  } catch (error) {
+    const validationError = new Error(
+      error.message.startsWith("URL gambar")
+        ? error.message
+        : "URL gambar tidak valid."
+    );
+    validationError.status = 400;
+    throw validationError;
+  }
+
+  return imageUrl;
+}
+
 function respondWithSchemaError(res, error) {
-  // PGRST204: kolom tidak dikenal PostgREST; 42703: kolom belum ada di PostgreSQL.
-  if (error?.code !== "PGRST204" && error?.code !== "42703") return false;
+  if (error?.code !== "PGRST204") return false;
 
   res.status(500).json({
     data: null,
     message:
-      "Kolom description belum ada di tabel services. Jalankan perintah berikut di Supabase SQL Editor: ALTER TABLE public.services ADD COLUMN IF NOT EXISTS description TEXT; NOTIFY pgrst, 'reload schema'; lalu simpan ulang layanan. Detail: " +
+      "Schema tabel services belum terbaca oleh Supabase API. Pastikan kolom category dan kuota sudah ada, lalu jalankan NOTIFY pgrst, 'reload schema'; di Supabase SQL Editor. Detail: " +
       error.message,
   });
   return true;
 }
 
-function normalizeDescription(description) {
-  if (description === undefined || description === null) return null;
-  const value = String(description).trim();
-  return value ? value : null;
-}
-
 const getAllServices = async (req, res) => {
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("services")
     .select("*")
     .order("id", { ascending: true });
@@ -46,7 +67,7 @@ router.get("/api/services", getAllServices);
 router.get("/api/services/:id", async (req, res) => {
   const { id } = req.params;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("services")
     .select("*")
     .eq("id", id)
@@ -69,8 +90,7 @@ router.get("/api/services/:id", async (req, res) => {
 });
 
 router.post("/api/services", authenticate, allowRoles("admin"), async (req, res) => {
-  const { title, price, image_data: imageData, category, kuota, description } =
-    req.body;
+  const { title, price, image, category, kuota } = req.body;
 
   if (
     !title ||
@@ -85,20 +105,9 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
     });
   }
 
-  if (
-    description !== undefined &&
-    description !== null &&
-    typeof description !== "string"
-  ) {
-    return res.status(400).json({
-      data: null,
-      message: "Deskripsi layanan harus berupa teks.",
-    });
-  }
-
-  let image;
+  let imageUrl;
   try {
-    image = await uploadServiceImage(imageData);
+    imageUrl = normalizeImageUrl(image);
   } catch (error) {
     return res.status(error.status || 500).json({
       data: null,
@@ -106,16 +115,15 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
     });
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("services")
     .insert([
       {
         title,
         price,
         kuota,
-        image,
+        image: imageUrl,
         category: category || "lainnya",
-        description: normalizeDescription(description),
       },
     ])
     .select()
@@ -134,32 +142,12 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
 router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, res) => {
   const { id } = req.params;
-  const { title, price, image_data: imageData, category, kuota, description } =
-    req.body;
+  const { title, price, image, category, kuota } = req.body;
 
-  if (
-    !title &&
-    price === undefined &&
-    imageData === undefined &&
-    category === undefined &&
-    kuota === undefined &&
-    description === undefined
-  ) {
+  if (!title && price === undefined && image === undefined && category === undefined && kuota === undefined) {
     return res.status(400).json({
       data: null,
-      message:
-        "Setidaknya salah satu field (title, price, image, category, kuota, description) harus diisi untuk update.",
-    });
-  }
-
-  if (
-    description !== undefined &&
-    description !== null &&
-    typeof description !== "string"
-  ) {
-    return res.status(400).json({
-      data: null,
-      message: "Deskripsi layanan harus berupa teks.",
+      message: "Setidaknya salah satu field (title, price, image) harus diisi untuk update.",
     });
   }
 
@@ -167,9 +155,6 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
   if (title !== undefined) updatePayload.title = title;
   if (price !== undefined) updatePayload.price = price;
   if (category !== undefined) updatePayload.category = category;
-  if (description !== undefined) {
-    updatePayload.description = normalizeDescription(description);
-  }
   if (kuota !== undefined) {
     if (!Number.isInteger(Number(kuota)) || Number(kuota) < 0) {
       return res.status(400).json({
@@ -180,9 +165,9 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
     updatePayload.kuota = kuota;
   }
 
-  if (imageData !== undefined) {
+  if (image !== undefined) {
     try {
-      updatePayload.image = await uploadServiceImage(imageData);
+      updatePayload.image = normalizeImageUrl(image);
     } catch (error) {
       return res.status(error.status || 500).json({
         data: null,
@@ -191,7 +176,7 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
     }
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("services")
     .update(updatePayload)
     .eq("id", id)
@@ -219,7 +204,7 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
 router.delete("/api/services/:id", authenticate, allowRoles("admin"), async (req, res) => {
   const { id } = req.params;
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("services")
     .delete()
     .eq("id", id)

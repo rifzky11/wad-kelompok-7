@@ -1,12 +1,12 @@
-const { supabaseAdmin } = require("../db");
+const { supabase } = require("../db");
 const { verifyToken } = require("../utils/auth");
 
 function ensureDb(req, res, next) {
-  if (!supabaseAdmin) {
+  if (!supabase) {
     return res.status(503).json({
       data: null,
       message:
-        "Database belum dikonfigurasi. Pastikan SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY ada di .env.",
+        "Database belum dikonfigurasi. Pastikan SUPABASE_URL dan SUPABASE_ANON_KEY ada di .env.",
     });
   }
   next();
@@ -31,10 +31,10 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ data: null, message: "Autentikasi diperlukan." });
   }
 
-  if (!supabaseAdmin) {
+  if (!supabase) {
     return res.status(503).json({
       data: null,
-      message: "Database auth belum dikonfigurasi. Tambahkan SUPABASE_SERVICE_ROLE_KEY.",
+      message: "Database auth belum dikonfigurasi. Tambahkan SUPABASE_ANON_KEY.",
     });
   }
 
@@ -47,7 +47,7 @@ async function authenticate(req, res, next) {
       });
     }
 
-    const { data: profile, error: profileError } = await supabaseAdmin
+    const { data: profile, error: profileError } = await supabase
       .from("users")
       .select("id, email, nama_lengkap, role")
       .eq("id", payload.sub)
@@ -99,7 +99,7 @@ function allowRoles(...roles) {
 }
 
 module.exports = {
-  supabaseAdmin,
+  supabase,
   ensureDb,
   normalizeRole,
   authenticate,

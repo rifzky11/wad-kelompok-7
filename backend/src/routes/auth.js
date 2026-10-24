@@ -1,7 +1,7 @@
 const express = require("express");
 const crypto = require("crypto");
 const {
-  supabaseAdmin,
+  supabase,
   normalizeRole,
 } = require("../middleware/auth");
 const {
@@ -17,10 +17,10 @@ router.post("/api/auth/login", async (req, res) => {
   if (role === "guest") {
     return res.json({ data: { role: "guest", user: null, session: null }, message: "Masuk sebagai guest." });
   }
-  if (!supabaseAdmin || !process.env.JWT_SECRET) {
+  if (!supabase || !process.env.JWT_SECRET) {
     return res.status(503).json({
       data: null,
-      message: "Auth belum dikonfigurasi. Isi SUPABASE_SERVICE_ROLE_KEY dan JWT_SECRET.",
+      message: "Auth belum dikonfigurasi. Isi SUPABASE_URL, SUPABASE_ANON_KEY, dan JWT_SECRET.",
     });
   }
   if (!email || !password) {
@@ -31,7 +31,7 @@ router.post("/api/auth/login", async (req, res) => {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
-  const { data: account, error } = await supabaseAdmin
+  const { data: account, error } = await supabase
     .from("users")
     .select("id, email, nama_lengkap, role, password_hash")
     .eq("email", normalizedEmail)
@@ -75,10 +75,10 @@ router.post("/api/auth/login", async (req, res) => {
 
 router.post("/api/auth/register", async (req, res) => {
   const { email, password, nama_lengkap } = req.body;
-  if (!supabaseAdmin || !process.env.JWT_SECRET) {
+  if (!supabase || !process.env.JWT_SECRET) {
     return res.status(503).json({
       data: null,
-      message: "Auth belum dikonfigurasi. Isi SUPABASE_SERVICE_ROLE_KEY dan JWT_SECRET.",
+      message: "Auth belum dikonfigurasi. Isi SUPABASE_URL, SUPABASE_ANON_KEY, dan JWT_SECRET.",
     });
   }
   if (!email || !password || !nama_lengkap) {
@@ -90,7 +90,7 @@ router.post("/api/auth/register", async (req, res) => {
 
   const normalizedEmail = email.trim().toLowerCase();
   const normalizedName = nama_lengkap.trim();
-  const { data: existingAccount, error: existingError } = await supabaseAdmin
+  const { data: existingAccount, error: existingError } = await supabase
     .from("users")
     .select("id")
     .eq("email", normalizedEmail)
@@ -109,7 +109,7 @@ router.post("/api/auth/register", async (req, res) => {
 
   const id = crypto.randomUUID();
   const passwordHash = await hashPassword(password);
-  const { data: account, error } = await supabaseAdmin
+  const { data: account, error } = await supabase
     .from("users")
     .insert({
       id,
@@ -135,7 +135,7 @@ router.post("/api/auth/register", async (req, res) => {
       });
     }
 
-    const { error: patientError } = await supabaseAdmin.from("patients").insert({
+    const { error: patientError } = await supabase.from("patients").insert({
       user_id: account.id,
       no_rm: `RM-${account.id.slice(0, 8)}`,
       nik: account.id.replaceAll("-", "").slice(0, 20),
@@ -145,7 +145,7 @@ router.post("/api/auth/register", async (req, res) => {
     });
 
     if (patientError) {
-      await supabaseAdmin.from("users").delete().eq("id", account.id);
+      await supabase.from("users").delete().eq("id", account.id);
       console.error("Failed to create patient profile:", patientError.message);
       return res.status(500).json({
         data: null,
