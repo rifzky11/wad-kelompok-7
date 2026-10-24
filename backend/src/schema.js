@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS services (
   kuota INT NOT NULL DEFAULT 10 CHECK (kuota >= 0),
   image TEXT,
   category VARCHAR(50) NOT NULL DEFAULT 'lainnya',
+  description TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -36,6 +37,9 @@ ADD COLUMN IF NOT EXISTS category VARCHAR(50) NOT NULL DEFAULT 'lainnya';
 
 ALTER TABLE public.services
 ADD COLUMN IF NOT EXISTS kuota INT NOT NULL DEFAULT 10;
+
+ALTER TABLE public.services
+ADD COLUMN IF NOT EXISTS description TEXT;
 
 -- Patients
 CREATE TABLE IF NOT EXISTS patients (

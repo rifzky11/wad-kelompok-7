@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api";
 
 function LayananMedis({ session }) {
@@ -8,6 +8,9 @@ function LayananMedis({ session }) {
   const [error, setError] = useState("");
   const [notification, setNotification] = useState({ type: "", message: "" });
   const [selectedService, setSelectedService] = useState(null);
+  const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const detailRequestId = useRef(0);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,6 +18,7 @@ function LayananMedis({ session }) {
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     title: "",
+    description: "",
     price: "",
     kuota: 10,
     image: "",
@@ -40,6 +44,20 @@ function LayananMedis({ session }) {
     });
   }, []);
 
+  // Tutup modal detail dengan tombol Escape
+  useEffect(() => {
+    if (!selectedService) return;
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setSelectedService(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedService]);
+
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => {
@@ -52,6 +70,7 @@ function LayananMedis({ session }) {
     setEditingId(null);
     setFormData({
       title: "",
+      description: "",
       price: "",
       kuota: 10,
       image: "",
@@ -65,6 +84,7 @@ function LayananMedis({ session }) {
     setEditingId(service.id);
     setFormData({
       title: service.title,
+      description: service.description || "",
       price: service.price,
       kuota: service.kuota ?? 10,
       image: service.image || "",
@@ -94,6 +114,7 @@ function LayananMedis({ session }) {
         method,
         body: JSON.stringify({
           title: formData.title,
+          description: formData.description,
           price: Number(formData.price),
           kuota: Number(formData.kuota),
           category: formData.category,
@@ -136,8 +157,36 @@ function LayananMedis({ session }) {
     }
   };
 
+  // Buka detail layanan (ambil data terbaru dari API)
   const openService = async (service) => {
+    const requestId = detailRequestId.current + 1;
+    detailRequestId.current = requestId;
     setSelectedService(service);
+    setDetailError("");
+    setIsDetailLoading(true);
+
+    try {
+      const result = await apiRequest(`/api/services/${service.id}`);
+      if (requestId !== detailRequestId.current) return;
+      if (result.data) {
+        setSelectedService(result.data);
+      }
+    } catch (err) {
+      if (requestId !== detailRequestId.current) return;
+      setDetailError(err.message);
+    } finally {
+      if (requestId === detailRequestId.current) {
+        setIsDetailLoading(false);
+      }
+    }
+  };
+
+  const closeServiceDetail = () => {
+    // Batalkan hasil fetch yang masih berjalan agar modal tidak terbuka kembali.
+    detailRequestId.current += 1;
+    setSelectedService(null);
+    setDetailError("");
+    setIsDetailLoading(false);
   };
 
   return (
@@ -242,7 +291,14 @@ function LayananMedis({ session }) {
                 onClick={() => openService(service)}
                 role="button"
                 tabIndex={0}
-                className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md hover:border-emerald-200"
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    openService(service);
+                  }
+                }}
+                className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md hover:border-emerald-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2"
               >
                 <div>
                   <div className="relative h-48 w-full overflow-hidden bg-slate-100">
@@ -266,6 +322,11 @@ function LayananMedis({ session }) {
                     <h3 className="line-clamp-2 text-base font-bold text-slate-900 group-hover:text-emerald-700 transition">
                       {service.title}
                     </h3>
+                    {service.description && (
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">
+                        {service.description}
+                      </p>
+                    )}
                     <p className="mt-2 text-xl font-black text-emerald-600">
                       Rp {Number(service.price).toLocaleString("id-ID")}
                     </p>
@@ -273,6 +334,10 @@ function LayananMedis({ session }) {
                       {service.category === "obat"
                         ? `Stok tersedia: ${service.kuota ?? 0}`
                         : `Kuota tersedia: ${service.kuota ?? 0}`}
+                    </p>
+                    <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
+                      Lihat detail
+                      <span aria-hidden="true">→</span>
                     </p>
                   </div>
                 </div>
@@ -377,6 +442,24 @@ function LayananMedis({ session }) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                  Deskripsi Layanan
+                </label>
+                <textarea
+                  rows="4"
+                  placeholder="Jelaskan cakupan layanan, manfaat, dan hal yang perlu diketahui pasien..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    setFormData({ ...formData, description: e.target.value })
+                  }
+                  className="w-full resize-y rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  Deskripsi ini tampil pada kartu dan halaman detail layanan.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
                   Tarif / Harga (Rp) *
                 </label>
                 <input
@@ -442,41 +525,98 @@ function LayananMedis({ session }) {
         </div>
       )}
 
+      {/* Modal Detail Layanan */}
       {selectedService && (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase text-emerald-600">
-                  {selectedService.category || "lainnya"}
-                </p>
-                <h2 className="mt-1 text-2xl font-bold text-slate-900">
-                  {selectedService.title}
-                </h2>
-                <p className="mt-1 font-semibold text-emerald-600">
-                  Rp {Number(selectedService.price).toLocaleString("id-ID")}
-                </p>
-              </div>
+        <div
+          className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/60 p-4 backdrop-blur-sm sm:items-center"
+          onClick={closeServiceDetail}
+          role="presentation"
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="service-detail-title"
+            onClick={(event) => event.stopPropagation()}
+            className="my-8 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold uppercase tracking-wider text-emerald-700">
+                {selectedService.category || "lainnya"}
+              </span>
               <button
                 type="button"
-                onClick={() => setSelectedService(null)}
-                className="text-2xl text-slate-400"
+                onClick={closeServiceDetail}
+                aria-label="Tutup detail layanan"
+                className="text-2xl leading-none text-slate-400 transition hover:text-slate-600"
               >
                 &times;
               </button>
             </div>
-            <p className="mt-6 text-sm text-slate-600">
-              {selectedService.category === "obat" ? (
-                <>
-                  Stok tersedia: <strong>{selectedService.kuota ?? 0}</strong>.
-                </>
-              ) : (
-                <>
-                  Kuota tersedia: <strong>{selectedService.kuota ?? 0}</strong>.
-                </>
-              )}{" "}
-              Silakan hubungi admin untuk informasi lebih lanjut.
-            </p>
+
+            <div className="grid gap-6 p-6 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)]">
+              <div className="h-56 w-full overflow-hidden rounded-xl bg-slate-100 sm:h-full sm:min-h-[16rem]">
+                {selectedService.image ? (
+                  <img
+                    src={selectedService.image}
+                    alt={selectedService.title}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm font-semibold text-slate-400">
+                    Foto belum tersedia
+                  </div>
+                )}
+              </div>
+
+              <div className="flex min-w-0 flex-col">
+                <h2
+                  id="service-detail-title"
+                  className="text-2xl font-bold text-slate-900"
+                >
+                  {selectedService.title}
+                </h2>
+                <p className="mt-2 text-2xl font-black text-emerald-600">
+                  Rp {Number(selectedService.price).toLocaleString("id-ID")}
+                </p>
+
+                <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                    {selectedService.category === "obat"
+                      ? "Stok obat tersedia"
+                      : "Kuota layanan tersedia"}
+                  </p>
+                  <p className="mt-1 text-lg font-bold text-emerald-800">
+                    {selectedService.kuota ?? 0}{" "}
+                    {selectedService.category === "obat" ? "unit" : "pasien"}
+                  </p>
+                </div>
+
+                <h3 className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">
+                  Deskripsi Layanan
+                </h3>
+                {isDetailLoading ? (
+                  <p className="mt-2 text-sm text-slate-500">
+                    Memuat detail layanan...
+                  </p>
+                ) : (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-7 text-slate-600">
+                    {selectedService.description ||
+                      "Belum ada deskripsi untuk layanan ini."}
+                  </p>
+                )}
+
+                {detailError && (
+                  <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                    Detail terbaru gagal dimuat: {detailError}
+                  </p>
+                )}
+
+                <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                  Silakan hubungi admin untuk reservasi atau informasi lebih
+                  lanjut mengenai layanan ini.
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       )}
