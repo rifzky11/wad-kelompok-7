@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api";
 
-function LayananMedis({ session }) {
+function LayananMedis({ session, navigate }) {
   const isAdmin = session?.role === "admin";
   const [services, setServices] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -11,6 +11,16 @@ function LayananMedis({ session }) {
   const [isDetailLoading, setIsDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState("");
   const detailRequestId = useRef(0);
+  const [isPatientFormOpen, setIsPatientFormOpen] = useState(false);
+  const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const [formError, setFormError] = useState("");
+  const [isActionLoading, setIsActionLoading] = useState(false);
+  const [patientForm, setPatientForm] = useState({
+    nik: "", nama_lengkap: session?.profile?.nama_lengkap || "", jenis_kelamin: "",
+    tanggal_lahir: "", no_telp: "", alamat: "",
+  });
+  const [orderForm, setOrderForm] = useState({ tanggal_kunjungan: "", jam_kunjungan: "", keluhan: "" });
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -187,6 +197,63 @@ function LayananMedis({ session }) {
     setSelectedService(null);
     setDetailError("");
     setIsDetailLoading(false);
+  };
+
+  const chooseService = async () => {
+    if (!session || session.role === "guest") {
+      navigate("/login");
+      return;
+    }
+    if (session.role !== "patient") {
+      setFormError("Hanya pasien yang dapat membuat pesanan.");
+      return;
+    }
+    setFormError("");
+    setIsActionLoading(true);
+    try {
+      await apiRequest("/api/patients/me");
+      setIsOrderFormOpen(true);
+    } catch (err) {
+      if (err.status === 404) setIsPatientFormOpen(true);
+      else setFormError(err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const registerPatient = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    setIsActionLoading(true);
+    try {
+      await apiRequest("/api/patients/me", { method: "POST", body: JSON.stringify(patientForm) });
+      setIsPatientFormOpen(false);
+      setIsOrderFormOpen(true);
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const placeOrder = async (event) => {
+    event.preventDefault();
+    setFormError("");
+    setIsActionLoading(true);
+    try {
+      const result = await apiRequest("/api/appointments", {
+        method: "POST",
+        body: JSON.stringify({ service_id: selectedService.id, ...orderForm }),
+      });
+      setIsOrderFormOpen(false);
+      setReceipt(result.data);
+      closeServiceDetail();
+      fetchServices();
+    } catch (err) {
+      setFormError(err.message);
+    } finally {
+      setIsActionLoading(false);
+    }
   };
 
   return (
@@ -612,11 +679,82 @@ function LayananMedis({ session }) {
                 )}
 
                 <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                  Silakan hubungi admin untuk reservasi atau informasi lebih
-                  lanjut mengenai layanan ini.
+                  Pilih layanan ini untuk mengajukan pesanan kepada admin.
                 </p>
+                {!isAdmin && (
+                  <button
+                    type="button"
+                    onClick={chooseService}
+                    disabled={isActionLoading || selectedService.kuota < 1}
+                    className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isActionLoading ? "Memeriksa data..." : selectedService.kuota < 1 ? "Kuota habis" : "Pilih Pesanan Ini"}
+                  </button>
+                )}
+                {formError && (
+                  <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
+                )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isPatientFormOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/60 p-4">
+          <form onSubmit={registerPatient} className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">Pendaftaran Pasien</h2>
+            <p className="mt-1 text-sm text-slate-500">Lengkapi data pasien sebelum membuat pesanan.</p>
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              {[
+                ["nik", "NIK", "text", "Nomor identitas"],
+                ["nama_lengkap", "Nama lengkap", "text", "Nama pasien"],
+                ["tanggal_lahir", "Tanggal lahir", "date", ""],
+                ["no_telp", "Nomor telepon", "tel", ""],
+              ].map(([name, label, type, placeholder]) => (
+                <label key={name} className="text-sm font-medium text-slate-700">
+                  {label}
+                  <input required={["nik", "nama_lengkap", "tanggal_lahir"].includes(name)} type={type} placeholder={placeholder} value={patientForm[name]} onChange={(e) => setPatientForm({ ...patientForm, [name]: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" />
+                </label>
+              ))}
+              <label className="text-sm font-medium text-slate-700">Jenis kelamin
+                <select required value={patientForm.jenis_kelamin} onChange={(e) => setPatientForm({ ...patientForm, jenis_kelamin: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2">
+                  <option value="">Pilih</option><option value="Laki-laki">Laki-laki</option><option value="Perempuan">Perempuan</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-slate-700 sm:col-span-2">Alamat
+                <textarea value={patientForm.alamat} onChange={(e) => setPatientForm({ ...patientForm, alamat: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows="2" />
+              </label>
+            </div>
+            {formError && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
+            <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setIsPatientFormOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Batal</button><button disabled={isActionLoading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isActionLoading ? "Menyimpan..." : "Daftar dan lanjutkan"}</button></div>
+          </form>
+        </div>
+      )}
+
+      {isOrderFormOpen && selectedService && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <form onSubmit={placeOrder} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-slate-900">Pesan {selectedService.title}</h2>
+            <label className="mt-5 block text-sm font-medium text-slate-700">Tanggal kunjungan<input required min={new Date().toISOString().slice(0, 10)} type="date" value={orderForm.tanggal_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, tanggal_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+            <label className="mt-4 block text-sm font-medium text-slate-700">Jam kunjungan<input required type="time" value={orderForm.jam_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, jam_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+            <label className="mt-4 block text-sm font-medium text-slate-700">Keluhan (opsional)<textarea value={orderForm.keluhan} onChange={(e) => setOrderForm({ ...orderForm, keluhan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows="3" /></label>
+            {formError && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
+            <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setIsOrderFormOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Batal</button><button disabled={isActionLoading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isActionLoading ? "Mengirim..." : "Kirim Pesanan"}</button></div>
+          </form>
+        </div>
+      )}
+
+      {receipt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" id="order-receipt">
+            <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Sehatin • Resi Pesanan</p>
+            <h2 className="mt-2 text-2xl font-bold text-slate-900">Pesanan diterima</h2>
+            <div className="mt-5 space-y-2 border-y border-dashed border-slate-300 py-4 text-sm">
+              <p><b>Nomor pesanan:</b> #{receipt.id}</p><p><b>Layanan:</b> {receipt.services?.title || selectedService?.title}</p><p><b>Pasien:</b> {receipt.patients?.nama_lengkap}</p><p><b>Jadwal:</b> {receipt.tanggal_kunjungan} {receipt.jam_kunjungan}</p><p><b>Status:</b> Menunggu konfirmasi admin</p>
+            </div>
+            <p className="mt-4 text-sm text-slate-600">Cetak resi ini dan serahkan kepada admin saat datang.</p>
+            <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => window.print()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Cetak Resi</button><button type="button" onClick={() => setReceipt(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Tutup</button></div>
           </div>
         </div>
       )}
