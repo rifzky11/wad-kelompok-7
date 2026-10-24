@@ -20,7 +20,6 @@ function LayananMedis({ session }) {
     image: "",
     category: "lainnya",
   });
-  const [imageFile, setImageFile] = useState(null);
   // Fetch daftar layanan
   const fetchServices = async () => {
     try {
@@ -58,7 +57,6 @@ function LayananMedis({ session }) {
       image: "",
       category: "lainnya",
     });
-    setImageFile(null);
     setIsModalOpen(true);
   };
 
@@ -72,7 +70,6 @@ function LayananMedis({ session }) {
       image: service.image || "",
       category: service.category || "lainnya",
     });
-    setImageFile(null);
     setIsModalOpen(true);
   };
 
@@ -91,14 +88,6 @@ function LayananMedis({ session }) {
     try {
       setIsSubmitting(true);
       const method = editingId ? "PUT" : "POST";
-      const imageData = imageFile
-        ? await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = () => reject(new Error("Foto gagal dibaca."));
-            reader.readAsDataURL(imageFile);
-          })
-        : undefined;
       await apiRequest(
         editingId ? `/api/services/${editingId}` : "/api/services",
         {
@@ -108,7 +97,7 @@ function LayananMedis({ session }) {
           price: Number(formData.price),
           kuota: Number(formData.kuota),
           category: formData.category,
-          ...(imageData ? { image_data: imageData } : {}),
+          image: formData.image.trim() || null,
         }),
         },
       );
@@ -405,18 +394,21 @@ function LayananMedis({ session }) {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Foto Layanan
+                  URL Foto Layanan
                 </label>
                 <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  onChange={(event) => setImageFile(event.target.files?.[0] || null)}
+                  type="url"
+                  placeholder="https://contoh.com/foto-layanan.jpg"
+                  value={formData.image}
+                  onChange={(event) =>
+                    setFormData({ ...formData, image: event.target.value })
+                  }
                   className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900"
                 />
                 <p className="mt-1 text-xs text-slate-500">
-                  Pilih foto langsung dari perangkat (JPG, PNG, atau WEBP).
+                  Masukkan URL publik foto (HTTP atau HTTPS).
                 </p>
-                {formData.image && !imageFile && (
+                {formData.image && (
                   <img
                     src={formData.image}
                     alt="Foto layanan saat ini"

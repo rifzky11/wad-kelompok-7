@@ -26,16 +26,11 @@ Buat `backend/.env` berdasarkan variabel berikut:
 ```env
 SUPABASE_URL=...
 SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
 JWT_SECRET=...
-
-# AWS S3 Storage
-AWS_REGION=ap-southeast-1
-AWS_ACCESS_KEY_ID=...
-AWS_SECRET_ACCESS_KEY=...
-AWS_BUCKET_NAME=services
-# AWS_ENDPOINT=... (opsional untuk endpoint S3-compatible)
 ```
+
+Gambar layanan disimpan sebagai URL publik HTTP atau HTTPS. Tidak ada proses
+unggah file atau penyimpanan gambar di backend.
 
 Jalankan backend dan frontend dari terminal terpisah:
 
@@ -46,8 +41,9 @@ cd frontend && npm run dev
 
 ## Database
 
-Jalankan `node src/schema.js` dari folder `backend` setelah `DATABASE_URL`
-tersedia, atau salin SQL yang dicetak ke Supabase SQL Editor. Schema tersebut
+Jalankan `node src/schema.js` dari folder `backend`, lalu salin SQL yang
+dicetak ke Supabase SQL Editor. Backend tidak menggunakan PostgreSQL SDK untuk
+menjalankan migrasi. Schema tersebut
 menambahkan kolom `services.kuota`, menghapus tabel legacy `doctors` dan
 `doctor_schedules`, serta melepas kolom dokter dari appointment dan rekam
 medis. Akun lama dengan role `doctor` dinormalisasi menjadi `patient`.

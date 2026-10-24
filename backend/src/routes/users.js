@@ -1,11 +1,11 @@
 const express = require("express");
-const { supabaseAdmin, authenticate, allowRoles } = require("../middleware/auth");
+const { supabase, authenticate, allowRoles } = require("../middleware/auth");
 
 const router = express.Router();
 
 router.get("/api/users", authenticate, allowRoles("admin"), async (req, res) => {
   const role = req.query.role;
-  let query = supabaseAdmin
+  let query = supabase
     .from("users")
     .select("id, email, nama_lengkap, role, created_at")
     .order("created_at", { ascending: false });
@@ -35,7 +35,7 @@ router.patch("/api/users/:id/role", authenticate, allowRoles("admin"), async (re
     });
   }
 
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from("users")
     .update({ role })
     .eq("id", req.params.id)

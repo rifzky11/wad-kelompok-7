@@ -1,5 +1,3 @@
-const { sql } = require("./db");
-
 const schemaSql = `
 -- Users
 CREATE TABLE IF NOT EXISTS public.users (
@@ -102,23 +100,10 @@ DROP TABLE IF EXISTS doctors CASCADE;
 `;
 
 async function createSchema() {
-  if (!sql) {
-    console.log(
-      "Catatan: DATABASE_URL belum diatur di .env. Anda dapat meng-copy query SQL di bawah ini dan menjalankannya di Supabase Dashboard -> SQL Editor:\n"
-    );
-    console.log(schemaSql);
-    return;
-  }
-
-  try {
-    console.log("Menjalankan migrasi schema ke PostgreSQL...");
-    await sql.unsafe(schemaSql);
-    console.log("Migrasi schema berhasil diselesaikan!");
-  } catch (err) {
-    console.error("Gagal menjalankan migrasi schema:", err.message);
-  } finally {
-    if (sql) await sql.end();
-  }
+  console.log(
+    "Salin SQL berikut ke Supabase Dashboard -> SQL Editor, lalu jalankan secara manual:\n"
+  );
+  console.log(schemaSql);
 }
 
 if (require.main === module) {
