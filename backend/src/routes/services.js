@@ -90,7 +90,7 @@ router.get("/api/services/:id", async (req, res) => {
 });
 
 router.post("/api/services", authenticate, allowRoles("admin"), async (req, res) => {
-  const { title, price, image, category, kuota } = req.body;
+  const { title, price, image, category, kuota, description, doctor_name, schedule } = req.body;
 
   if (
     !title ||
@@ -115,19 +115,34 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
     });
   }
 
-  const { data, error } = await supabase
+  const insertPayload = {
+    title,
+    price,
+    kuota,
+    image: imageUrl,
+    category: category || "lainnya",
+    description: description || null,
+  };
+  if (doctor_name !== undefined) insertPayload.doctor_name = doctor_name;
+  if (schedule !== undefined) insertPayload.schedule = schedule;
+
+  let { data, error } = await supabase
     .from("services")
-    .insert([
-      {
-        title,
-        price,
-        kuota,
-        image: imageUrl,
-        category: category || "lainnya",
-      },
-    ])
+    .insert([insertPayload])
     .select()
     .single();
+
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    delete insertPayload.doctor_name;
+    delete insertPayload.schedule;
+    const retry = await supabase
+      .from("services")
+      .insert([insertPayload])
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     if (respondWithSchemaError(res, error)) return;
@@ -142,12 +157,12 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
 
 router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, res) => {
   const { id } = req.params;
-  const { title, price, image, category, kuota } = req.body;
+  const { title, price, image, category, kuota, description, doctor_name, schedule } = req.body;
 
-  if (!title && price === undefined && image === undefined && category === undefined && kuota === undefined) {
+  if (!title && price === undefined && image === undefined && category === undefined && kuota === undefined && description === undefined && doctor_name === undefined && schedule === undefined) {
     return res.status(400).json({
       data: null,
-      message: "Setidaknya salah satu field (title, price, image) harus diisi untuk update.",
+      message: "Setidaknya salah satu field harus diisi untuk update.",
     });
   }
 
@@ -155,6 +170,9 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
   if (title !== undefined) updatePayload.title = title;
   if (price !== undefined) updatePayload.price = price;
   if (category !== undefined) updatePayload.category = category;
+  if (description !== undefined) updatePayload.description = description;
+  if (doctor_name !== undefined) updatePayload.doctor_name = doctor_name;
+  if (schedule !== undefined) updatePayload.schedule = schedule;
   if (kuota !== undefined) {
     if (!Number.isInteger(Number(kuota)) || Number(kuota) < 0) {
       return res.status(400).json({
@@ -176,12 +194,25 @@ router.put("/api/services/:id", authenticate, allowRoles("admin"), async (req, r
     }
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("services")
     .update(updatePayload)
     .eq("id", id)
     .select()
     .single();
+
+  if (error && (error.code === "42703" || error.code === "PGRST204")) {
+    delete updatePayload.doctor_name;
+    delete updatePayload.schedule;
+    const retry = await supabase
+      .from("services")
+      .update(updatePayload)
+      .eq("id", id)
+      .select()
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     if (respondWithSchemaError(res, error)) return;

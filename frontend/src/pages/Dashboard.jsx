@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
+import CashierReceiptModal from "../components/CashierReceiptModal";
 
 function Dashboard({ session, onLogout }) {
   const isAdmin = session?.role === "admin";
   const [orders, setOrders] = useState([]);
   const [ordersError, setOrdersError] = useState("");
+  const [selectedReceiptOrder, setSelectedReceiptOrder] = useState(null);
 
   useEffect(() => {
     apiRequest("/api/appointments")
@@ -95,23 +97,65 @@ function Dashboard({ session, onLogout }) {
           <div className="mt-5 overflow-x-auto">
             <table className="w-full min-w-[640px] text-left text-sm">
               <thead className="border-b border-slate-200 text-xs uppercase tracking-wider text-slate-500">
-                <tr><th className="px-3 py-3">Pesanan</th><th className="px-3 py-3">Pasien</th><th className="px-3 py-3">Jadwal</th><th className="px-3 py-3">Status</th></tr>
+                <tr>
+                  <th className="px-3 py-3">Pesanan</th>
+                  <th className="px-3 py-3">Pasien</th>
+                  <th className="px-3 py-3">Jadwal</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3 text-center">Struk</th>
+                </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {orders.map((order) => (
-                  <tr key={order.id}>
-                    <td className="px-3 py-3 font-semibold text-slate-900">#{order.id}<span className="block font-normal text-slate-500">{order.services?.title || "Layanan"}</span></td>
-                    <td className="px-3 py-3 text-slate-600">{order.patients?.nama_lengkap || "-"}</td>
-                    <td className="px-3 py-3 text-slate-600">{order.tanggal_kunjungan}<span className="block">{order.jam_kunjungan}</span></td>
+                  <tr key={order.id} className="hover:bg-slate-50/80 transition-colors">
+                    <td className="px-3 py-3 font-semibold text-slate-900">
+                      #{order.id}
+                      <span className="block font-normal text-slate-500">
+                        {order.services?.title || "Layanan"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">
+                      {order.patients?.nama_lengkap || "-"}
+                    </td>
+                    <td className="px-3 py-3 text-slate-600">
+                      {order.tanggal_kunjungan}
+                      <span className="block text-xs text-slate-400">
+                        {order.jam_kunjungan}
+                      </span>
+                    </td>
                     <td className="px-3 py-3">
                       {isAdmin ? (
-                        <select value={getOrderStatus(order)} onChange={(event) => updateStatus(order.id, event.target.value)} className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold">
-                          {!isMedicineOrder(order) && <option value="pending">Menunggu</option>}
+                        <select
+                          value={getOrderStatus(order)}
+                          onChange={(event) =>
+                            updateStatus(order.id, event.target.value)
+                          }
+                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold focus:border-emerald-500 focus:outline-none"
+                        >
+                          {!isMedicineOrder(order) && (
+                            <option value="pending">Menunggu</option>
+                          )}
                           <option value="confirmed">Dikonfirmasi</option>
                           <option value="completed">Selesai</option>
-                          {!isMedicineOrder(order) && <option value="cancelled">Dibatalkan</option>}
+                          {!isMedicineOrder(order) && (
+                            <option value="cancelled">Dibatalkan</option>
+                          )}
                         </select>
-                      ) : <span className="font-semibold capitalize text-emerald-700">{getOrderStatus(order)}</span>}
+                      ) : (
+                        <span className="font-semibold capitalize text-emerald-700">
+                          {getOrderStatus(order)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedReceiptOrder(order)}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 transition hover:bg-emerald-600 hover:text-white shadow-xs active:scale-95"
+                        title="Cetak Struk Kasir"
+                      >
+                        <span>🧾</span> Cetak Struk
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -120,6 +164,14 @@ function Dashboard({ session, onLogout }) {
           </div>
         )}
       </section>
+
+      {/* Modal Cetak Struk Kasir */}
+      {selectedReceiptOrder && (
+        <CashierReceiptModal
+          order={selectedReceiptOrder}
+          onClose={() => setSelectedReceiptOrder(null)}
+        />
+      )}
     </main>
   );
 }

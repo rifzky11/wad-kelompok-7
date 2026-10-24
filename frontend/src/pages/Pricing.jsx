@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api";
+import { getServiceDoctorSchedule } from "../data/doctors";
+import CashierReceiptModal from "../components/CashierReceiptModal";
 
 function LayananMedis({ session, navigate }) {
   const isAdmin = session?.role === "admin";
@@ -33,6 +35,8 @@ function LayananMedis({ session, navigate }) {
     kuota: 10,
     image: "",
     category: "lainnya",
+    doctor_name: "",
+    schedule: "",
   });
   // Fetch daftar layanan
   const fetchServices = async () => {
@@ -85,6 +89,8 @@ function LayananMedis({ session, navigate }) {
       kuota: 10,
       image: "",
       category: "lainnya",
+      doctor_name: "",
+      schedule: "",
     });
     setIsModalOpen(true);
   };
@@ -99,6 +105,8 @@ function LayananMedis({ session, navigate }) {
       kuota: service.kuota ?? 10,
       image: service.image || "",
       category: service.category || "lainnya",
+      doctor_name: service.doctor_name || "",
+      schedule: service.schedule || "",
     });
     setIsModalOpen(true);
   };
@@ -129,6 +137,8 @@ function LayananMedis({ session, navigate }) {
           kuota: Number(formData.kuota),
           category: formData.category,
           image: formData.image.trim() || null,
+          ...(formData.doctor_name ? { doctor_name: formData.doctor_name.trim() } : {}),
+          ...(formData.schedule ? { schedule: formData.schedule.trim() } : {}),
         }),
         },
       );
@@ -402,6 +412,25 @@ function LayananMedis({ session, navigate }) {
                         ? `Stok tersedia: ${service.kuota ?? 0}`
                         : `Kuota tersedia: ${service.kuota ?? 0}`}
                     </p>
+
+                    {/* Informasi Dokter & Jadwal Khusus Konsultasi & Pemeriksaan */}
+                    {(() => {
+                      const doctorInfo = getServiceDoctorSchedule(service);
+                      if (!doctorInfo) return null;
+                      return (
+                        <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 text-xs text-slate-700">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                            <span>{doctorInfo.icon || "👨‍⚕️"}</span>
+                            <span className="truncate">{doctorInfo.doctor}</span>
+                          </div>
+                          <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-800">
+                            <span>🕒</span>
+                            <span className="truncate">{doctorInfo.schedule}</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
                       Lihat detail
                       <span aria-hidden="true">→</span>
@@ -567,6 +596,44 @@ function LayananMedis({ session, navigate }) {
                 )}
               </div>
 
+              {(formData.category === "konsultasi" ||
+                formData.category === "pemeriksaan") && (
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-4 space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                    🩺 Pengaturan Dokter & Jadwal Kerja
+                  </p>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      Nama Dokter Bertugas (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: dr. Andi Pratama, Sp.PD"
+                      value={formData.doctor_name}
+                      onChange={(e) =>
+                        setFormData({ ...formData, doctor_name: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-emerald-500 outline-none bg-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                      Jadwal Kerja Dokter (Opsional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Senin – Jumat (08:00 – 14:00 WIB)"
+                      value={formData.schedule}
+                      onChange={(e) =>
+                        setFormData({ ...formData, schedule: e.target.value })
+                      }
+                      className="w-full rounded-xl border border-slate-300 px-4 py-2 text-sm text-slate-900 focus:border-emerald-500 outline-none bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
                 <button
                   type="button"
@@ -658,6 +725,40 @@ function LayananMedis({ session, navigate }) {
                   </p>
                 </div>
 
+                {/* Jadwal Pelayanan & Dokter Khusus Konsultasi & Pemeriksaan */}
+                {(() => {
+                  const doctorInfo = getServiceDoctorSchedule(selectedService);
+                  if (!doctorInfo) return null;
+                  return (
+                    <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
+                          Jadwal Praktik & Dokter Bertugas
+                        </span>
+                        <span className="rounded-full bg-emerald-200/80 px-2.5 py-0.5 text-[11px] font-bold text-emerald-900 border border-emerald-300">
+                          {doctorInfo.room}
+                        </span>
+                      </div>
+                      <div className="mt-3 flex items-start gap-3">
+                        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-2xl shadow-xs border border-emerald-200">
+                          {doctorInfo.icon}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-slate-900 text-sm sm:text-base">
+                            {doctorInfo.doctor}
+                          </h4>
+                          <p className="text-xs font-medium text-slate-600">
+                            {doctorInfo.specialty}
+                          </p>
+                          <div className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-200 shadow-2xs">
+                            <span>🕒</span> {doctorInfo.schedule}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 <h3 className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">
                   Deskripsi Layanan
                 </h3>
@@ -736,6 +837,20 @@ function LayananMedis({ session, navigate }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
           <form onSubmit={placeOrder} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900">Pesan {selectedService.title}</h2>
+            {(() => {
+              const doctorInfo = getServiceDoctorSchedule(selectedService);
+              if (!doctorInfo) return null;
+              return (
+                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+                  <div className="flex items-center gap-1.5 font-bold">
+                    <span>{doctorInfo.icon}</span>
+                    <span>Dokter: {doctorInfo.doctor}</span>
+                  </div>
+                  <p className="mt-1 font-medium">🕒 Jadwal: {doctorInfo.schedule}</p>
+                  <p className="mt-0.5 text-[11px] text-emerald-700">Pilih tanggal & jam sesuai jam operasional dokter di atas.</p>
+                </div>
+              );
+            })()}
             <label className="mt-5 block text-sm font-medium text-slate-700">Tanggal kunjungan<input required min={new Date().toISOString().slice(0, 10)} type="date" value={orderForm.tanggal_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, tanggal_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
             <label className="mt-4 block text-sm font-medium text-slate-700">Jam kunjungan<input required type="time" value={orderForm.jam_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, jam_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
             <label className="mt-4 block text-sm font-medium text-slate-700">Keluhan (opsional)<textarea value={orderForm.keluhan} onChange={(e) => setOrderForm({ ...orderForm, keluhan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows="3" /></label>
@@ -745,18 +860,12 @@ function LayananMedis({ session, navigate }) {
         </div>
       )}
 
+      {/* Modal Cetak Struk Kasir Setelah Pemesanan */}
       {receipt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" id="order-receipt">
-            <p className="text-xs font-bold uppercase tracking-widest text-emerald-600">Sehatin • Resi Pesanan</p>
-            <h2 className="mt-2 text-2xl font-bold text-slate-900">Pesanan diterima</h2>
-            <div className="mt-5 space-y-2 border-y border-dashed border-slate-300 py-4 text-sm">
-              <p><b>Nomor pesanan:</b> #{receipt.id}</p><p><b>Layanan:</b> {receipt.services?.title || selectedService?.title}</p><p><b>Pasien:</b> {receipt.patients?.nama_lengkap}</p><p><b>Jadwal:</b> {receipt.tanggal_kunjungan} {receipt.jam_kunjungan}</p><p><b>Status:</b> Menunggu konfirmasi admin</p>
-            </div>
-            <p className="mt-4 text-sm text-slate-600">Cetak resi ini dan serahkan kepada admin saat datang.</p>
-            <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => window.print()} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white">Cetak Resi</button><button type="button" onClick={() => setReceipt(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Tutup</button></div>
-          </div>
-        </div>
+        <CashierReceiptModal
+          order={receipt}
+          onClose={() => setReceipt(null)}
+        />
       )}
     </div>
   );
