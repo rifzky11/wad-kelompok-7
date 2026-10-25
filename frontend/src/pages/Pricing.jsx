@@ -39,14 +39,16 @@ function LayananMedis({ session, navigate }) {
     try {
       setIsLoading(true);
       setError("");
-      const result = await apiRequest("/api/services");
+      // Memanggil API dengan query params page dan limit
+      const result = await apiRequest(`/api/services?page=${page}&limit=8`);
       setServices(result.data || []);
+      setTotalPages(result.meta?.totalPages || 1);
     } catch (err) {
       setError(err.message);
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [page]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -75,7 +77,6 @@ function LayananMedis({ session, navigate }) {
     }, 4000);
   };
 
-  // Open modal create
   const handleOpenCreateModal = () => {
     setEditingId(null);
     setFormData({
@@ -89,7 +90,6 @@ function LayananMedis({ session, navigate }) {
     setIsModalOpen(true);
   };
 
-  // Open modal edit
   const handleOpenEditModal = (service) => {
     setEditingId(service.id);
     setFormData({
@@ -103,14 +103,9 @@ function LayananMedis({ session, navigate }) {
     setIsModalOpen(true);
   };
 
-  // Submit modal (Create or Update)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (
-      !formData.title ||
-      !formData.price ||
-      formData.kuota < 0
-    ) {
+    if (!formData.title || !formData.price || formData.kuota < 0) {
       alert("Nama layanan, tarif, dan kuota harus diisi dengan benar!");
       return;
     }
@@ -140,7 +135,13 @@ function LayananMedis({ session, navigate }) {
           : "Layanan baru berhasil ditambahkan!"
       );
       setIsModalOpen(false);
-      fetchServices();
+      
+      // Jika baru tambah data dan posisi tidak di page 1, paksa pindah ke page 1
+      if (!editingId && page !== 1) {
+        setPage(1);
+      } else {
+        fetchServices();
+      }
     } catch (err) {
       alert(`Gagal: ${err.message}`);
     } finally {
@@ -148,7 +149,6 @@ function LayananMedis({ session, navigate }) {
     }
   };
 
-  // Delete Service
   const handleDelete = async (id, title) => {
     const confirmDelete = window.confirm(
       `Apakah Anda yakin ingin menghapus layanan "${title}"?`
@@ -161,7 +161,13 @@ function LayananMedis({ session, navigate }) {
       });
 
       showNotification("success", `Layanan "${title}" berhasil dihapus.`);
-      setServices((prev) => prev.filter((s) => s.id !== id));
+      
+      // Keamanan: Jika data yang dihapus adalah satu-satunya data di halaman saat ini, mundur ke halaman sebelumnya
+      if (services.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        fetchServices();
+      }
     } catch (err) {
       alert(`Gagal: ${err.message}`);
     }
@@ -305,7 +311,7 @@ function LayananMedis({ session, navigate }) {
         {isLoading && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <div className="h-10 w-10 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent"></div>
-            <p className="mt-4 text-slate-600 font-medium">Memuat data layanan...</p>
+            <p className="mt-4 font-medium text-slate-600">Memuat data layanan...</p>
           </div>
         )}
 
@@ -316,11 +322,11 @@ function LayananMedis({ session, navigate }) {
               ⚠️
             </div>
             <h3 className="mt-4 text-lg font-bold text-slate-900">Gagal Memuat Layanan</h3>
-            <p className="mt-2 text-sm text-slate-600 max-w-md mx-auto">{error}</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-slate-600">{error}</p>
             <div className="mt-6 flex justify-center gap-3">
               <button
                 onClick={fetchServices}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
                 Coba Lagi
               </button>
@@ -335,13 +341,13 @@ function LayananMedis({ session, navigate }) {
               🏥
             </div>
             <h3 className="mt-4 text-lg font-bold text-slate-900">Belum Ada Layanan Medis</h3>
-            <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
+            <p className="mx-auto mt-2 max-w-sm text-sm text-slate-500">
               Belum ada data layanan di database. Anda dapat menambahkan data layanan baru menggunakan tombol di bawah.
             </p>
             {isAdmin && (
               <button
                 onClick={handleOpenCreateModal}
-                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition"
+                className="mt-6 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
               >
                 + Tambah Layanan Sekarang
               </button>
@@ -349,7 +355,7 @@ function LayananMedis({ session, navigate }) {
           </div>
         )}
 
-        {/* Services Grid */}
+        {/* Services Grid & Pagination */}
         {!isLoading && !error && services.length > 0 && (
           <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {services.map((service) => (
@@ -409,33 +415,69 @@ function LayananMedis({ session, navigate }) {
                   </div>
                 </div>
 
-                {isAdmin && (
-                  <div className="border-t border-slate-100 bg-slate-50/50 p-4 flex items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleOpenEditModal(service);
-                      }}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-emerald-600"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDelete(service.id, service.title);
-                      }}
-                      className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
-                    >
-                      Hapus
-                    </button>
-                  </div>
-                )}
+                  {isAdmin && (
+                    <div className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/50 p-4">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleOpenEditModal(service);
+                        }}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100 hover:text-emerald-600"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          handleDelete(service.id, service.title);
+                        }}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                      >
+                        Hapus
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="mt-10 flex items-center justify-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Prev
+                </button>
+
+                {pageNumbers.map((num) => (
+                  <button
+                    key={num}
+                    onClick={() => setPage(num)}
+                    className={`rounded-md border px-4 py-2 text-sm font-medium transition-colors ${
+                      page === num
+                        ? "border-emerald-600 bg-emerald-600 text-white"
+                        : "border-slate-300 text-slate-700 hover:bg-slate-50"
+                    }`}
+                  >
+                    {num}
+                  </button>
+                ))}
+
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Next
+                </button>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -450,15 +492,15 @@ function LayananMedis({ session, navigate }) {
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 text-xl font-bold"
+                className="text-xl font-bold text-slate-400 hover:text-slate-600"
               >
                 &times;
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="space-y-4 p-6">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   {formData.category === "obat" ? "Stok obat *" : "Kuota layanan *"}
                 </label>
                 <input
@@ -469,12 +511,12 @@ function LayananMedis({ session, navigate }) {
                   onChange={(e) =>
                     setFormData({ ...formData, kuota: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Kategori *
                 </label>
                 <select
@@ -492,7 +534,7 @@ function LayananMedis({ session, navigate }) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+                <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-700">
                   Nama Layanan Medis *
                 </label>
                 <input
@@ -503,7 +545,7 @@ function LayananMedis({ session, navigate }) {
                   onChange={(e) =>
                     setFormData({ ...formData, title: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -538,7 +580,7 @@ function LayananMedis({ session, navigate }) {
                   onChange={(e) =>
                     setFormData({ ...formData, price: e.target.value })
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
                 />
               </div>
 
@@ -567,18 +609,18 @@ function LayananMedis({ session, navigate }) {
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex items-center justify-end gap-3 border-t border-slate-100 pt-4">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100 transition"
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition disabled:opacity-50"
+                  className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50"
                 >
                   {isSubmitting
                     ? "Menyimpan..."
