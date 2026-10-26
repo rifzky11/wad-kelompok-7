@@ -45,20 +45,43 @@ function respondWithSchemaError(res, error) {
 }
 
 const getAllServices = async (req, res) => {
-  const { data, error } = await supabase
-    .from("services")
-    .select("*")
-    .order("id", { ascending: true });
+  try {
+    if (!supabase) {
+      return res.status(503).json({
+        data: null,
+        message: "Database belum dikonfigurasi. Pastikan SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY tersedia.",
+      });
+    }
 
-  if (error) {
-    if (respondWithSchemaError(res, error)) return;
-    return res.status(500).json({ data: null, message: error.message });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit) || 8);
+    const from = (page - 1) * limit;
+    const to = from + limit - 1;
+
+    const { data, error, count } = await supabase
+      .from("services")
+      .select("*", { count: "exact" })
+      .order("id", { ascending: true })
+      .range(from, to);
+
+    if (error) {
+      if (respondWithSchemaError(res, error)) return;
+      return res.status(500).json({ data: null, message: error.message });
+    }
+
+    res.status(200).json({
+      data,
+      meta: {
+        currentPage: page,
+        limit: limit,
+        totalData: count || 0,
+        totalPages: Math.ceil((count || 0) / limit) || 1,
+      },
+      message: "Daftar layanan berhasil diambil.",
+    });
+  } catch (err) {
+    res.status(500).json({ data: null, message: "Terjadi kesalahan server internal." });
   }
-
-  res.status(200).json({
-    data,
-    message: "Daftar layanan berhasil diambil.",
-  });
 };
 
 router.get("/services", getAllServices);
@@ -105,14 +128,16 @@ router.post("/api/services", authenticate, allowRoles("admin"), async (req, res)
     });
   }
 
-  let imageUrl;
-  try {
-    imageUrl = normalizeImageUrl(image);
-  } catch (error) {
-    return res.status(error.status || 500).json({
-      data: null,
-      message: error.message,
-    });
+  let imageUrl = null;
+  if (image !== undefined) {
+    try {
+      imageUrl = normalizeImageUrl(image);
+    } catch (error) {
+      return res.status(error.status || 500).json({
+        data: null,
+        message: error.message,
+      });
+    }
   }
 
   const insertPayload = {
