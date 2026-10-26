@@ -1,4 +1,4 @@
-const { supabase } = require("./db");
+const { query } = require("./db");
 
 const initialServices = [
   {
@@ -76,94 +76,63 @@ const initialServices = [
 ];
 
 async function seedData() {
-  if (!supabase) {
-    console.error("Supabase client belum terinisialisasi. Periksa .env!");
-    return;
-  }
-
   console.log("Memulai seeding data 'services'...");
 
-  const { data: existing, error: checkError } = await supabase
-    .from("services")
-    .select("id")
-    .limit(1);
+  try {
+    // Cek apakah tabel services sudah ada data
+    const existing = await query("SELECT id FROM services LIMIT 1");
 
-  if (checkError) {
-    console.error("Gagal memeriksa tabel services:", checkError.message);
-    console.log(
-      "\nPastikan tabel 'services' sudah dibuat di Supabase sebelum seeding! Jalankan DDL dari schema.js di SQL Editor Supabase."
-    );
-    return;
-  }
+    if (existing.rows.length > 0) {
+      // Ambil semua services untuk backfill deskripsi yang kosong
+      const rows = await query("SELECT id, title, description FROM services");
 
-  if (existing && existing.length > 0) {
-    const { data: rows, error: rowsError } = await supabase
-      .from("services")
-      .select("id, title, description");
+      const backfill = rows.rows
+        .map((row) => {
+          if (row.description && row.description.trim()) return null;
+          const seedService = initialServices.find((item) => item.title === row.title);
+          return seedService ? { id: row.id, description: seedService.description } : null;
+        })
+        .filter(Boolean);
 
-    if (rowsError) {
-      console.error("Gagal membaca data services:", rowsError.message);
-      console.log(
-        "\nPastikan kolom 'description' sudah ada. Jalankan node src/schema.js atau SQL dari file tersebut di Supabase SQL Editor."
-      );
-      return;
-    }
-
-    // Lengkapi deskripsi layanan bawaan yang masih kosong (idempotent).
-    const backfill = (rows || [])
-      .map((row) => {
-        if (row.description && row.description.trim()) return null;
-        const seedService = initialServices.find(
-          (item) => item.title === row.title
-        );
-        return seedService
-          ? { id: row.id, description: seedService.description }
-          : null;
-      })
-      .filter(Boolean);
-
-    if (backfill.length === 0) {
-      console.log(
-        "Tabel 'services' sudah memiliki data. Melewatkan seeding atau Anda bisa truncate terlebih dahulu."
-      );
-      return;
-    }
-
-    let updated = 0;
-    for (const item of backfill) {
-      const { error: updateError } = await supabase
-        .from("services")
-        .update({ description: item.description })
-        .eq("id", item.id);
-
-      if (updateError) {
-        console.error(
-          `Gagal melengkapi deskripsi layanan ID ${item.id}:`,
-          updateError.message
-        );
-        continue;
+      if (backfill.length === 0) {
+        console.log("Tabel 'services' sudah memiliki data. Melewatkan seeding atau Anda bisa truncate terlebih dahulu.");
+        return;
       }
 
-      updated += 1;
+      let updated = 0;
+      for (const item of backfill) {
+        try {
+          await query("UPDATE services SET description = $1 WHERE id = $2", [item.description, item.id]);
+          updated += 1;
+        } catch (updateErr) {
+          console.error(`Gagal melengkapi deskripsi layanan ID ${item.id}:`, updateErr.message);
+        }
+      }
+
+      console.log(`Tabel 'services' sudah memiliki data. Berhasil melengkapi deskripsi untuk ${updated} layanan medis.`);
+      return;
     }
 
-    console.log(
-      `Tabel 'services' sudah memiliki data. Berhasil melengkapi deskripsi untuk ${updated} layanan medis.`
-    );
-    return;
-  }
+    // Insert semua services
+    let inserted = 0;
+    for (const service of initialServices) {
+      await query(
+        `INSERT INTO services (title, price, kuota, category, description, image)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [service.title, service.price, service.kuota, service.category, service.description, service.image]
+      );
+      inserted += 1;
+    }
 
-  const { data, error } = await supabase.from("services").insert(initialServices).select();
-
-  if (error) {
-    console.error("Gagal memasukkan seed services:", error.message);
-  } else {
-    console.log(`Berhasil menambahkan ${data.length} data layanan medis!`);
+    console.log(`Berhasil menambahkan ${inserted} data layanan medis!`);
+  } catch (err) {
+    console.error("Gagal seeding services:", err.message);
+    console.log("\nPastikan tabel 'services' sudah dibuat. Jalankan DDL dari schema.js terlebih dahulu.");
   }
 }
 
 if (require.main === module) {
-  seedData();
+  seedData().then(() => process.exit(0)).catch(() => process.exit(1));
 }
 
 module.exports = { seedData, initialServices };

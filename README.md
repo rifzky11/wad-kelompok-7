@@ -77,5 +77,10 @@ bawaan yang masih kosong tanpa mengubah data lain.
 | DELETE | `/api/services/:id` | Admin menghapus layanan |
 | POST | `/api/auth/register` | Registrasi pasien |
 | POST | `/api/auth/login` | Login pasien/admin |
+| GET | `/api/appointments/receipt/:code` | Admin mencari struk berdasarkan kode unik |
 
 Endpoint dokter dan endpoint jadwal dokter sudah tidak tersedia.
+
+Setiap pesanan baru mendapatkan `kode_unik` pada struk. Admin dapat memasukkan
+kode tersebut pada bagian **Verifikasi struk** di Dashboard untuk membuka data
+pesanan terkait.
