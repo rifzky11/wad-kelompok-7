@@ -458,38 +458,6 @@ function LayananMedis({ session, navigate }) {
                         <span aria-hidden="true">→</span>
                       </p>
                     </div>
-                    )}
-                    <p className="mt-2 text-xl font-black text-emerald-600">
-                      Rp {Number(service.price).toLocaleString("id-ID")}
-                    </p>
-                    <p className="mt-2 text-sm font-semibold text-slate-600">
-                      {service.category === "obat"
-                        ? `Stok tersedia: ${service.kuota ?? 0}`
-                        : `Kuota tersedia: ${service.kuota ?? 0}`}
-                    </p>
-
-                    {/* Informasi Dokter & Jadwal Khusus Konsultasi & Pemeriksaan */}
-                    {(() => {
-                      const doctorInfo = getServiceDoctorSchedule(service);
-                      if (!doctorInfo) return null;
-                      return (
-                        <div className="mt-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-2.5 text-xs text-slate-700">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-900">
-                            <span>{doctorInfo.icon || "👨‍⚕️"}</span>
-                            <span className="truncate">{doctorInfo.doctor}</span>
-                          </div>
-                          <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-emerald-800">
-                            <span>🕒</span>
-                            <span className="truncate">{doctorInfo.schedule}</span>
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <p className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                      Lihat detail
-                      <span aria-hidden="true">→</span>
-                    </p>
                   </div>
 
                   {isAdmin && (
