@@ -22,54 +22,6 @@ function About({ navigate }) {
     },
   ];
 
-  const teamMembers = [
-    {
-      name: "Muhammad Farrel Al Ghifary",
-      nim: "25110300026",
-      role: "Project Coordinator & Fullstack",
-      initials: "FA",
-      badgeColor: "bg-blue-100 text-blue-800",
-      contribution:
-        "Koordinasi arsitektur sistem, sinkronisasi alur fitur antarmuka, dan manajemen integrasi modul.",
-    },
-    {
-      name: "Kevin Arya Saputra",
-      nim: "25110300007",
-      role: "Backend & Data Integration",
-      initials: "KA",
-      badgeColor: "bg-indigo-100 text-indigo-800",
-      contribution:
-        "Pengembangan REST API Express, integrasi database Supabase PostgreSQL, dan logic autentikasi multi-role.",
-    },
-    {
-      name: "Chandra Tabligh Wiguna",
-      nim: "25110300017",
-      role: "Frontend Development",
-      initials: "CT",
-      badgeColor: "bg-teal-100 text-teal-800",
-      contribution:
-        "Pengembangan komponen React modular, styling antarmuka Tailwind CSS, serta integrasi fetch data API.",
-    },
-    {
-      name: "Brilliant Gibran Adhinata",
-      nim: "25110300019",
-      role: "API Design & Database Architecture",
-      initials: "BG",
-      badgeColor: "bg-emerald-100 text-emerald-800",
-      contribution:
-        "Rancang bangun arsitektur data ERD relasional, spesifikasi kontrak API endpoint, dan standardisasi database.",
-    },
-    {
-      name: "Nawwaf Dzakwan Sigit",
-      nim: "25110300022",
-      role: "UI/UX & Quality Assurance",
-      initials: "ND",
-      badgeColor: "bg-amber-100 text-amber-800",
-      contribution:
-        "Penyempurnaan tata letak visual antarmuka pengguna, pengujian alur interaksi, dan validasi mutu aplikasi.",
-    },
-  ];
-
   return (
     <div className="space-y-16 py-12 md:py-16">
       {/* 1. Hero About */}
@@ -241,66 +193,7 @@ function About({ navigate }) {
         </div>
       </section>
 
-      {/* 4. Tim Pengembang (Kelompok 7) */}
-      <section className="bg-slate-900 py-16 text-white">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-12 text-center">
-            <span className="inline-block rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-semibold text-emerald-400">
-              SHOWCASE TIM PROYEK
-            </span>
-            <h2 className="mt-3 text-3xl font-extrabold sm:text-4xl">
-              Tim Pengembang — Kelompok 7
-            </h2>
-            <p className="mx-auto mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
-              Final Project Mata Kuliah Web Application Development (WAD) • Program Studi S1 Ilmu Komputer, Universitas Cakrawala.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {teamMembers.map((member) => (
-              <div
-                key={member.nim}
-                className="flex flex-col justify-between rounded-2xl border border-slate-800 bg-slate-800/80 p-6 shadow-md transition duration-300 hover:border-emerald-500/50 hover:bg-slate-800"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-base font-extrabold text-white shadow-inner">
-                      {member.initials}
-                    </div>
-                    <span className="rounded-full bg-slate-700 px-2.5 py-1 text-xs font-mono text-slate-300">
-                      NIM: {member.nim}
-                    </span>
-                  </div>
-
-                  <h3 className="mt-4 text-lg font-bold text-white">
-                    {member.name}
-                  </h3>
-                  <p className="text-xs font-semibold text-emerald-400">
-                    {member.role}
-                  </p>
-
-                  <p className="mt-3 text-xs leading-relaxed text-slate-300">
-                    {member.contribution}
-                  </p>
-                </div>
-              </div>
-            ))}
-
-            {/* Project Summary Card */}
-            <div className="flex flex-col justify-center rounded-2xl border border-dashed border-emerald-500/50 bg-emerald-950/30 p-6 text-center">
-              <span className="text-3xl">💻</span>
-              <h4 className="mt-3 text-base font-bold text-emerald-300">
-                Arsitektur Modern
-              </h4>
-              <p className="mt-2 text-xs leading-relaxed text-emerald-200/80">
-                Frontend React 19 + Vite + Tailwind CSS terhubung dengan Node.js Express REST API dan Supabase Cloud Database.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Informasi Operasional & Kontak */}
+      {/* 4. Informasi Operasional & Kontak */}
       <section className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
         <div className="grid gap-8 md:grid-cols-2">
           {/* Jam Operasional */}
