@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { toPng } from "html-to-image";
+import { useEffect, useState } from "react";
 import { getServiceDoctorSchedule } from "../data/doctors";
 
 function CashierReceiptModal({ order, onClose }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Escape") onClose();
@@ -45,6 +48,31 @@ function CashierReceiptModal({ order, onClose }) {
     window.print();
   };
 
+  const handleDownload = async () => {
+    const receiptElement = document.getElementById("cashier-thermal-receipt");
+    if (!receiptElement) return;
+
+    setIsDownloading(true);
+    try {
+      const downloadUrl = await toPng(receiptElement, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+        cacheBust: true,
+      });
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = `struk-${formattedOrderId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error("Gagal membuat gambar struk:", error);
+      window.alert("Struk gagal diunduh sebagai PNG. Silakan coba lagi.");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/70 p-4 backdrop-blur-xs"
@@ -86,9 +114,6 @@ function CashierReceiptModal({ order, onClose }) {
       >
         {/* Floating Action Buttons Bar (No-Print) */}
         <div className="no-print mb-3 flex w-full items-center justify-between gap-3 px-1">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600/90 px-3 py-1 text-xs font-bold text-white shadow-xs">
-            <span>🧾</span> Struk Kasir Klinik
-          </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
@@ -96,6 +121,14 @@ function CashierReceiptModal({ order, onClose }) {
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-emerald-700 active:scale-95"
             >
               <span>🖨️</span> Cetak Struk
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={isDownloading}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-slate-900 active:scale-95"
+            >
+              <span>⬇️</span> {isDownloading ? "Menyiapkan..." : "Download PNG"}
             </button>
             <button
               type="button"
