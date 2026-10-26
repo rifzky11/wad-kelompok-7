@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { apiRequest } from "../lib/api";
 import { getServiceDoctorSchedule } from "../data/doctors";
 import CashierReceiptModal from "../components/CashierReceiptModal";
+import OrderStatusModal from "../components/OrderStatusModal";
 
 function LayananMedis({ session, navigate }) {
   const isAdmin = session?.role === "admin";
@@ -16,6 +17,7 @@ function LayananMedis({ session, navigate }) {
   const [isPatientFormOpen, setIsPatientFormOpen] = useState(false);
   const [isOrderFormOpen, setIsOrderFormOpen] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [orderStatus, setOrderStatus] = useState(null);
   const [formError, setFormError] = useState("");
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [page, setPage] = useState(1);
@@ -277,11 +279,20 @@ function LayananMedis({ session, navigate }) {
         body: JSON.stringify({ service_id: selectedService.id, ...orderForm }),
       });
       setIsOrderFormOpen(false);
-      setReceipt(result.data);
       closeServiceDetail();
+      setOrderStatus({
+        type: "success",
+        message: "Layanan berhasil dipesan. Silakan simpan struk untuk ditunjukkan saat kunjungan.",
+        order: result.data,
+      });
       fetchServices();
     } catch (err) {
-      setFormError(err.message);
+      setIsOrderFormOpen(false);
+      closeServiceDetail();
+      setOrderStatus({
+        type: "error",
+        message: err.message || "Pesanan tidak dapat dibuat. Silakan coba lagi.",
+      });
     } finally {
       setIsActionLoading(false);
     }
@@ -914,6 +925,15 @@ function LayananMedis({ session, navigate }) {
           onClose={() => setReceipt(null)}
         />
       )}
+
+      <OrderStatusModal
+        status={orderStatus}
+        onClose={() => setOrderStatus(null)}
+        onDownload={() => {
+          setReceipt(orderStatus?.order);
+          setOrderStatus(null);
+        }}
+      />
     </div>
   );
 }
