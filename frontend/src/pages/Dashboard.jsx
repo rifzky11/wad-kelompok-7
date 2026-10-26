@@ -12,7 +12,10 @@ function Dashboard({ session, onLogout }) {
   const [selectedReceiptOrder, setSelectedReceiptOrder] = useState(null);
   const [receiptCode, setReceiptCode] = useState("");
   const [receiptLookupError, setReceiptLookupError] = useState("");
+  const [receiptScanSuccess, setReceiptScanSuccess] = useState("");
   const [isLookingUpReceipt, setIsLookingUpReceipt] = useState(false);
+  const [scannedReceiptOrder, setScannedReceiptOrder] = useState(null);
+  const [isUpdatingScanStatus, setIsUpdatingScanStatus] = useState(false);
 
   useEffect(() => {
     apiRequest(`/api/appointments?page=${page}&limit=8`)
@@ -36,8 +39,12 @@ function Dashboard({ session, onLogout }) {
           order.id === id ? { ...order, status } : order,
         ),
       );
+      if (scannedReceiptOrder && scannedReceiptOrder.id === id) {
+        setScannedReceiptOrder((prev) => ({ ...prev, status }));
+      }
     } catch (error) {
       setOrdersError(error.message);
+      throw error;
     }
   };
 
@@ -50,26 +57,80 @@ function Dashboard({ session, onLogout }) {
     }
 
     setReceiptLookupError("");
+    setReceiptScanSuccess("");
     setIsLookingUpReceipt(true);
     try {
       const result = await apiRequest(
         `/api/appointments/receipt/${encodeURIComponent(code)}`,
       );
-      setSelectedReceiptOrder(result.data);
+      setScannedReceiptOrder(result.data);
     } catch (error) {
       setReceiptLookupError(error.message);
+      setScannedReceiptOrder(null);
     } finally {
       setIsLookingUpReceipt(false);
     }
   };
 
-  const isMedicineOrder = (order) => order.services?.category === "obat";
+  const handleQuickComplete = async (orderId) => {
+    setIsUpdatingScanStatus(true);
+    setReceiptLookupError("");
+    try {
+      await updateStatus(orderId, "completed");
+      setReceiptScanSuccess("Pesanan berhasil diselesaikan!");
+    } catch (error) {
+      setReceiptLookupError(error.message || "Gagal menyelesaikan pesanan.");
+    } finally {
+      setIsUpdatingScanStatus(false);
+    }
+  };
+
+  const handleScanStatusChange = async (orderId, newStatus) => {
+    setIsUpdatingScanStatus(true);
+    setReceiptLookupError("");
+    try {
+      await updateStatus(orderId, newStatus);
+      setReceiptScanSuccess(`Status pesanan berhasil diubah menjadi: ${newStatus}`);
+    } catch (error) {
+      setReceiptLookupError(error.message || "Gagal mengubah status pesanan.");
+    } finally {
+      setIsUpdatingScanStatus(false);
+    }
+  };
+
+  const isMedicineOrder = (order) => order?.services?.category === "obat";
   const getOrderStatus = (order) =>
     isMedicineOrder(order)
       ? order.status === "completed"
         ? "completed"
         : "confirmed"
       : order.status || "pending";
+
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case "completed":
+        return "bg-emerald-100 text-emerald-800 border-emerald-300";
+      case "confirmed":
+        return "bg-blue-100 text-blue-800 border-blue-300";
+      case "cancelled":
+        return "bg-rose-100 text-rose-800 border-rose-300";
+      default:
+        return "bg-amber-100 text-amber-800 border-amber-300";
+    }
+  };
+
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case "completed":
+        return "Selesai (Lunas)";
+      case "confirmed":
+        return "Dikonfirmasi";
+      case "cancelled":
+        return "Dibatalkan";
+      default:
+        return "Menunggu";
+    }
+  };
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
@@ -87,24 +148,24 @@ function Dashboard({ session, onLogout }) {
         </div>
         <button
           onClick={onLogout}
-          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition"
         >
           Keluar
         </button>
       </div>
 
       {isAdmin && (
-        <section className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-6 shadow-sm">
+        <section className="mt-8 rounded-2xl border border-emerald-200 bg-emerald-50/60 p-6 shadow-sm">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-emerald-600">
-              Verifikasi struk
+              Verifikasi Struk
             </p>
             <h2 className="mt-1 text-xl font-bold text-slate-900">
               Scan struk dengan kode unik
             </h2>
             <p className="mt-2 text-sm text-slate-600">
               Masukkan kode unik yang tercetak pada struk untuk membuka data
-              pesanan pasien.
+              pesanan pasien dan mengubah status pesanan menjadi selesai.
             </p>
           </div>
           <form
@@ -120,22 +181,172 @@ function Dashboard({ session, onLogout }) {
               onChange={(event) =>
                 setReceiptCode(event.target.value.toUpperCase())
               }
-              placeholder="Contoh: STRK-A1B2C3D4E5"
+              placeholder="Contoh: STRK-A1B2C3D4E5 atau SEH-00007"
               maxLength={32}
-              className="min-w-0 flex-1 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm uppercase tracking-wider text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              className="min-w-0 flex-1 rounded-lg border border-emerald-300 bg-white px-3.5 py-2 text-sm uppercase tracking-wider text-slate-900 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
             />
             <button
               type="submit"
               disabled={isLookingUpReceipt}
-              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-emerald-600 px-5 py-2 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60 shadow-xs"
             >
               {isLookingUpReceipt ? "Mencari..." : "Cari Struk"}
             </button>
           </form>
+
           {receiptLookupError && (
-            <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+            <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700 border border-red-200">
               {receiptLookupError}
             </p>
+          )}
+
+          {receiptScanSuccess && (
+            <p className="mt-3 rounded-lg bg-emerald-100 p-3 text-sm text-emerald-800 border border-emerald-300 font-medium">
+              ✓ {receiptScanSuccess}
+            </p>
+          )}
+
+          {/* Card Hasil Scan Struk */}
+          {scannedReceiptOrder && (
+            <div className="mt-5 rounded-xl border border-emerald-300 bg-white p-5 shadow-md">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white font-bold text-sm">
+                    🧾
+                  </span>
+                  <div>
+                    <h3 className="font-bold text-slate-900 text-base">
+                      Pesanan #{scannedReceiptOrder.id}
+                    </h3>
+                    <p className="text-xs text-slate-500 font-mono">
+                      Kode: {scannedReceiptOrder.kode_unik || `SEH-${String(scannedReceiptOrder.id).padStart(5, "0")}`}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStatusBadgeClass(
+                      scannedReceiptOrder.status
+                    )}`}
+                  >
+                    {getStatusLabel(scannedReceiptOrder.status)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScannedReceiptOrder(null);
+                      setReceiptScanSuccess("");
+                    }}
+                    className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 text-sm"
+                    title="Tutup hasil verifikasi"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              {/* Rincian Pesanan */}
+              <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+                <div className="rounded-lg bg-slate-50 p-2.5">
+                  <span className="block text-slate-400 font-medium mb-0.5">Pasien</span>
+                  <p className="font-bold text-slate-800 text-sm">
+                    {scannedReceiptOrder.patients?.nama_lengkap || "-"}
+                  </p>
+                  <p className="text-slate-500 font-mono text-[11px]">
+                    RM: {scannedReceiptOrder.patients?.no_rm || "-"}
+                  </p>
+                  {scannedReceiptOrder.patients?.no_telp && (
+                    <p className="text-slate-500 text-[11px]">
+                      Telp: {scannedReceiptOrder.patients.no_telp}
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-2.5">
+                  <span className="block text-slate-400 font-medium mb-0.5">Layanan</span>
+                  <p className="font-bold text-slate-800 text-sm">
+                    {scannedReceiptOrder.services?.title || "Layanan Medis"}
+                  </p>
+                  <p className="uppercase text-emerald-700 font-semibold text-[11px]">
+                    {scannedReceiptOrder.services?.category || "Umum"}
+                  </p>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 p-2.5">
+                  <span className="block text-slate-400 font-medium mb-0.5">Jadwal & Keluhan</span>
+                  <p className="font-semibold text-slate-800">
+                    {scannedReceiptOrder.tanggal_kunjungan?.includes("T")
+                      ? scannedReceiptOrder.tanggal_kunjungan.split("T")[0]
+                      : scannedReceiptOrder.tanggal_kunjungan}{" "}
+                    {scannedReceiptOrder.jam_kunjungan}
+                  </p>
+                  {scannedReceiptOrder.keluhan && (
+                    <p className="text-slate-500 italic text-[11px] truncate">
+                      &ldquo;{scannedReceiptOrder.keluhan}&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                <div className="rounded-lg bg-emerald-50/70 border border-emerald-100 p-2.5">
+                  <span className="block text-emerald-700 font-medium mb-0.5">Total Biaya</span>
+                  <p className="font-extrabold text-emerald-900 text-base">
+                    Rp {Number(scannedReceiptOrder.services?.price || 0).toLocaleString("id-ID")}
+                  </p>
+                  <p className="text-slate-500 text-[11px]">Metode: Kasir/Tunai</p>
+                </div>
+              </div>
+
+              {/* Action Bar Admin untuk Selesaikan Pesanan */}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  {scannedReceiptOrder.status !== "completed" ? (
+                    <button
+                      type="button"
+                      disabled={isUpdatingScanStatus}
+                      onClick={() => handleQuickComplete(scannedReceiptOrder.id)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
+                    >
+                      <span>✅</span> {isUpdatingScanStatus ? "Menyelesaikan..." : "Selesaikan Pesanan"}
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                      <span>✓</span> Pesanan Sudah Selesai
+                    </span>
+                  )}
+
+                  {/* Dropdown status pesanan */}
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                    <span>Ubah status:</span>
+                    <select
+                      value={getOrderStatus(scannedReceiptOrder)}
+                      disabled={isUpdatingScanStatus}
+                      onChange={(e) =>
+                        handleScanStatusChange(scannedReceiptOrder.id, e.target.value)
+                      }
+                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                    >
+                      {!isMedicineOrder(scannedReceiptOrder) && (
+                        <option value="pending">Menunggu</option>
+                      )}
+                      <option value="confirmed">Dikonfirmasi</option>
+                      <option value="completed">Selesai</option>
+                      {!isMedicineOrder(scannedReceiptOrder) && (
+                        <option value="cancelled">Dibatalkan</option>
+                      )}
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedReceiptOrder(scannedReceiptOrder)}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-600 hover:text-white shadow-xs active:scale-95"
+                >
+                  <span>🧾</span> Preview Struk
+                </button>
+              </div>
+            </div>
           )}
         </section>
       )}
@@ -190,7 +401,9 @@ function Dashboard({ session, onLogout }) {
                       {order.patients?.nama_lengkap || "-"}
                     </td>
                     <td className="px-3 py-3 text-slate-600">
-                      {order.tanggal_kunjungan?.includes("T") ? order.tanggal_kunjungan.split("T")[0] : order.tanggal_kunjungan}
+                      {order.tanggal_kunjungan?.includes("T")
+                        ? order.tanggal_kunjungan.split("T")[0]
+                        : order.tanggal_kunjungan}
                       <span className="block text-xs text-slate-400">
                         {order.jam_kunjungan}
                       </span>
@@ -266,6 +479,13 @@ function Dashboard({ session, onLogout }) {
       {selectedReceiptOrder && (
         <CashierReceiptModal
           order={selectedReceiptOrder}
+          isAdmin={isAdmin}
+          onUpdateStatus={async (id, newStatus) => {
+            await updateStatus(id, newStatus);
+            if (scannedReceiptOrder && scannedReceiptOrder.id === id) {
+              setScannedReceiptOrder((prev) => ({ ...prev, status: newStatus }));
+            }
+          }}
           onClose={() => setSelectedReceiptOrder(null)}
         />
       )}

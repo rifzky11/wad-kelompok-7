@@ -2,8 +2,14 @@ import { toPng } from "html-to-image";
 import { useEffect, useState } from "react";
 import { getServiceDoctorSchedule } from "../data/doctors";
 
-function CashierReceiptModal({ order, onClose }) {
+function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }) {
+  const [currentOrder, setCurrentOrder] = useState(order);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+
+  useEffect(() => {
+    setCurrentOrder(order);
+  }, [order]);
 
   useEffect(() => {
     const handleKeyDown = (event) => {
@@ -13,14 +19,14 @@ function CashierReceiptModal({ order, onClose }) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  if (!order) return null;
+  if (!currentOrder) return null;
 
-  const service = order.services || {};
-  const patient = order.patients || {};
+  const service = currentOrder.services || {};
+  const patient = currentOrder.patients || {};
   const doctorInfo = getServiceDoctorSchedule(service);
 
-  const formattedOrderId = `SEH-${String(order.id).padStart(5, "0")}`;
-  const receiptCode = order.kode_unik || formattedOrderId;
+  const formattedOrderId = `SEH-${String(currentOrder.id).padStart(5, "0")}`;
+  const receiptCode = currentOrder.kode_unik || formattedOrderId;
   const printDate = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -74,9 +80,25 @@ function CashierReceiptModal({ order, onClose }) {
     }
   };
 
+  const handleSetStatus = async (newStatus) => {
+    if (!currentOrder?.id) return;
+    setIsUpdatingStatus(true);
+    try {
+      if (onUpdateStatus) {
+        await onUpdateStatus(currentOrder.id, newStatus);
+      }
+      setCurrentOrder((prev) => ({ ...prev, status: newStatus }));
+    } catch (error) {
+      console.error("Gagal memperbarui status pesanan:", error);
+      window.alert(error.message || "Gagal memperbarui status pesanan.");
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-900/70 p-4 backdrop-blur-xs"
+      className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/75 p-3 sm:p-4 backdrop-blur-xs"
       onClick={onClose}
       role="presentation"
     >
@@ -95,9 +117,9 @@ function CashierReceiptModal({ order, onClose }) {
             left: 50% !important;
             top: 20px !important;
             transform: translateX(-50%) !important;
-            width: 320px !important;
+            width: 280px !important;
             margin: 0 !important;
-            padding: 16px !important;
+            padding: 12px !important;
             box-shadow: none !important;
             border: 1px solid #ddd !important;
             background: white !important;
@@ -109,246 +131,292 @@ function CashierReceiptModal({ order, onClose }) {
         }
       `}</style>
 
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative my-6 flex flex-col items-center"
-      >
-        {/* Floating Action Buttons Bar (No-Print) */}
-        <div className="no-print mb-3 flex w-full items-center justify-between gap-3 px-1">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handlePrint}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-emerald-700 active:scale-95"
-            >
-              <span>🖨️</span> Cetak Struk
-            </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={isDownloading}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2 text-xs font-bold text-white shadow-md transition hover:bg-slate-900 active:scale-95"
-            >
-              <span>⬇️</span> {isDownloading ? "Menyiapkan..." : "Download PNG"}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 shadow-xs transition hover:bg-slate-100"
-            >
-              Tutup ✕
-            </button>
-          </div>
-        </div>
-
-        {/* The Thermal Cashier Receipt Container */}
+      <div className="flex min-h-full items-center justify-center py-4 sm:py-6">
         <div
-          id="cashier-thermal-receipt"
-          className="w-full max-w-[340px] rounded-lg bg-white p-5 font-mono text-[11px] leading-relaxed text-slate-800 shadow-2xl border border-slate-200"
+          onClick={(e) => e.stopPropagation()}
+          className="relative flex w-full max-w-[290px] flex-col items-center"
         >
-          {/* Header Struk */}
-          <div className="text-center">
-            <div className="mx-auto mb-1 flex h-7 w-7 items-center justify-center rounded-md bg-emerald-600 text-sm font-black text-white">
-              +
+          {/* Action Buttons Bar (No-Print) */}
+          <div className="no-print mb-2.5 flex w-full flex-col gap-1.5">
+            <div className="flex w-full items-center justify-between gap-1.5">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1.5 text-[11px] font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95"
+                title="Cetak struk ke printer thermal"
+              >
+                <span>🖨️</span> Cetak
+              </button>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={isDownloading}
+                className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-slate-800 px-2 py-1.5 text-[11px] font-bold text-white shadow-xs transition hover:bg-slate-900 active:scale-95 disabled:opacity-60"
+                title="Download struk sebagai gambar PNG"
+              >
+                <span>⬇️</span> {isDownloading ? "..." : "PNG"}
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-xs transition hover:bg-slate-100 active:scale-95"
+              >
+                Tutup ✕
+              </button>
             </div>
-            <h2 className="text-sm font-black tracking-wider text-slate-900">
-              KLINIK SEHATIN
-            </h2>
-            <p className="text-[10px] text-slate-500">
-              Jl. Rasuna Said No. 7, Jakarta Selatan
-            </p>
-            <p className="text-[10px] text-slate-500">
-              Telp: (021) 7788-9900 • WA: 0812-7777-2026
-            </p>
-            <p className="text-[9px] text-slate-400">
-              www.sehatin.id • Izin Klinik: 445/07/DKS/2026
-            </p>
+
+            {/* Quick Status Action for Admin */}
+            {isAdmin && onUpdateStatus && (
+              <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px]">
+                {currentOrder.status === "completed" ? (
+                  <div className="flex w-full items-center justify-between">
+                    <span className="font-bold text-emerald-800 flex items-center gap-1 text-[11px]">
+                      <span>✓</span> Status: Selesai
+                    </span>
+                    <button
+                      type="button"
+                      disabled={isUpdatingStatus}
+                      onClick={() => handleSetStatus("confirmed")}
+                      className="text-[10px] text-slate-500 underline hover:text-slate-800"
+                    >
+                      Batal Selesai
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={isUpdatingStatus}
+                    onClick={() => handleSetStatus("completed")}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 py-1 font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
+                  >
+                    <span>✅</span> {isUpdatingStatus ? "Menyimpan..." : "Selesaikan Pesanan"}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          <div className="my-2 border-b border-dashed border-slate-400"></div>
+          {/* Compact Thermal Cashier Receipt Container */}
+          <div
+            id="cashier-thermal-receipt"
+            className="w-full max-w-[285px] rounded-lg bg-white p-3.5 font-mono text-[9.5px] leading-tight text-slate-800 shadow-xl border border-slate-200"
+          >
+            {/* Header Struk */}
+            <div className="text-center">
+              <div className="mx-auto mb-1 flex h-5 w-5 items-center justify-center rounded bg-emerald-600 text-xs font-black text-white">
+                +
+              </div>
+              <h2 className="text-xs font-black tracking-wide text-slate-900">
+                KLINIK SEHATIN
+              </h2>
+              <p className="text-[8.5px] text-slate-500">
+                Jl. Rasuna Said No. 7, Jakarta Selatan
+              </p>
+              <p className="text-[8.5px] text-slate-500">
+                Telp: (021) 7788-9900 • WA: 0812-7777-2026
+              </p>
+              <p className="text-[8px] text-slate-400">
+                www.sehatin.id • Izin: 445/07/DKS/2026
+              </p>
+            </div>
 
-          {/* Judul & Info Transaksi */}
-          <div className="text-center font-bold tracking-wider text-slate-900">
-            STRUK RESERVASI LAYANAN
-          </div>
-          <div className="my-1.5 border-b border-dashed border-slate-300"></div>
+            <div className="my-1.5 border-b border-dashed border-slate-300"></div>
 
-          <div className="space-y-1 text-slate-700">
-            <div className="flex justify-between">
-              <span>No. Transaksi</span>
-              <span className="font-bold text-slate-900">#{formattedOrderId}</span>
+            {/* Judul & Info Transaksi */}
+            <div className="text-center font-bold tracking-wider text-slate-900 text-[9.5px]">
+              STRUK RESERVASI LAYANAN
             </div>
-            <div className="flex justify-between">
-              <span>Kode Unik Struk</span>
-              <span className="font-bold text-slate-900">{receiptCode}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Waktu Cetak</span>
-              <span className="text-[10px] text-slate-500">{printDate}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Kasir / Loket</span>
-              <span>POS-01 (Klinik)</span>
-            </div>
-          </div>
+            <div className="my-1 border-b border-dashed border-slate-200"></div>
 
-          <div className="my-2 border-b border-dashed border-slate-400"></div>
-
-          {/* Informasi Pasien */}
-          <div className="space-y-1 text-slate-700">
-            <div className="flex justify-between">
-              <span>Nama Pasien</span>
-              <span className="font-bold text-slate-900 truncate max-w-[170px]">
-                {patient.nama_lengkap || "Pasien Sehatin"}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span>No. Rekam Medis</span>
-              <span className="font-semibold text-slate-800">
-                {patient.no_rm || `RM-${String(order.id).padStart(6, "0")}`}
-              </span>
-            </div>
-            {patient.no_telp && (
+            <div className="space-y-0.5 text-slate-700">
               <div className="flex justify-between">
-                <span>No. Telepon</span>
-                <span>{patient.no_telp}</span>
+                <span>No. Transaksi</span>
+                <span className="font-bold text-slate-900">#{formattedOrderId}</span>
               </div>
-            )}
-          </div>
-
-          <div className="my-2 border-b border-dashed border-slate-400"></div>
-
-          {/* Rincian Layanan Medis */}
-          <div className="space-y-1.5">
-            <div className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-              Layanan Medis
-            </div>
-            <div className="font-bold text-slate-900 text-xs">
-              {service.title || "Layanan Medis"}
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Kategori</span>
-              <span className="uppercase font-semibold text-emerald-700">
-                {service.category || "Umum"}
-              </span>
-            </div>
-
-            {/* Khusus Pelayanan Medis Konsultasi & Pemeriksaan: Jadwal Dokter */}
-            {doctorInfo && (
-              <div className="my-1 rounded-sm bg-slate-50 p-2 border border-dashed border-slate-300 space-y-1 text-[10px]">
-                <div className="flex items-start justify-between gap-1">
-                  <span className="text-slate-500">Dokter :</span>
-                  <span className="font-bold text-slate-900 text-right">
-                    {doctorInfo.doctor}
-                  </span>
-                </div>
-                <div className="flex items-start justify-between gap-1">
-                  <span className="text-slate-500">Spesialis :</span>
-                  <span className="text-slate-700 text-right">
-                    {doctorInfo.specialty}
-                  </span>
-                </div>
-                <div className="flex items-start justify-between gap-1">
-                  <span className="text-slate-500">Jadwal :</span>
-                  <span className="font-semibold text-emerald-800 text-right">
-                    {doctorInfo.schedule}
-                  </span>
-                </div>
-                <div className="flex items-start justify-between gap-1">
-                  <span className="text-slate-500">Ruangan :</span>
-                  <span className="text-slate-700 text-right">
-                    {doctorInfo.room}
-                  </span>
-                </div>
+              <div className="flex justify-between">
+                <span>Kode Unik Struk</span>
+                <span className="font-bold text-slate-900">{receiptCode}</span>
               </div>
-            )}
-
-            <div className="flex justify-between text-slate-700">
-              <span>Jadwal Kunjungan</span>
-              <span className="font-bold text-slate-900">
-                {order.tanggal_kunjungan?.includes("T") ? order.tanggal_kunjungan.split("T")[0] : order.tanggal_kunjungan} {order.jam_kunjungan}
-              </span>
-            </div>
-
-            {order.keluhan && (
-              <div className="text-[10px] text-slate-500 italic">
-                Keluhan: &ldquo;{order.keluhan}&rdquo;
+              <div className="flex justify-between">
+                <span>Waktu Cetak</span>
+                <span className="text-[8.5px] text-slate-500">{printDate}</span>
               </div>
-            )}
-          </div>
-
-          <div className="my-2 border-b border-dashed border-slate-400"></div>
-
-          {/* Rincian Tarif / Biaya Kasir */}
-          <div className="space-y-1 text-slate-700">
-            <div className="flex justify-between">
-              <span>1x {service.title || "Layanan"}</span>
-              <span>Rp {priceNumber.toLocaleString("id-ID")}</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Biaya Registrasi / Loket</span>
-              <span>Rp 0 (GRATIS)</span>
-            </div>
-            <div className="flex justify-between text-[10px] text-slate-500">
-              <span>Pajak (PPN 0%)</span>
-              <span>Rp 0</span>
+              <div className="flex justify-between">
+                <span>Kasir / Loket</span>
+                <span>POS-01 (Klinik)</span>
+              </div>
             </div>
 
-            <div className="my-1.5 border-b-2 border-slate-800"></div>
+            <div className="my-1.5 border-b border-dashed border-slate-300"></div>
 
-            <div className="flex justify-between text-xs font-black text-slate-900">
-              <span>TOTAL PEMBAYARAN</span>
-              <span>Rp {priceNumber.toLocaleString("id-ID")}</span>
+            {/* Informasi Pasien */}
+            <div className="space-y-0.5 text-slate-700">
+              <div className="flex justify-between">
+                <span>Nama Pasien</span>
+                <span className="font-bold text-slate-900 truncate max-w-[145px]">
+                  {patient.nama_lengkap || "Pasien Sehatin"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span>No. Rekam Medis</span>
+                <span className="font-semibold text-slate-800">
+                  {patient.no_rm || `RM-${String(currentOrder.id).padStart(6, "0")}`}
+                </span>
+              </div>
+              {patient.no_telp && (
+                <div className="flex justify-between">
+                  <span>No. Telepon</span>
+                  <span>{patient.no_telp}</span>
+                </div>
+              )}
             </div>
-            <div className="flex justify-between text-[10px] text-slate-600">
-              <span>Metode Pembayaran</span>
-              <span>KASIR / TUNAI / QRIS</span>
-            </div>
-            <div className="flex justify-between text-[10px] font-bold">
-              <span>STATUS PESANAN</span>
-              <span className="text-emerald-700">
-                [ {getStatusBadge(order.status)} ]
-              </span>
-            </div>
-          </div>
 
-          <div className="my-3 border-b border-dashed border-slate-400"></div>
+            <div className="my-1.5 border-b border-dashed border-slate-300"></div>
 
-          {/* Barcode Kasir */}
-          <div className="text-center">
-            {/* Realistic Barcode Stripes */}
-            <div
-              className="mx-auto flex h-10 w-44 items-center justify-center gap-[2px] overflow-hidden py-1"
-              aria-hidden="true"
-            >
-              {[
-                3, 1, 2, 1, 4, 1, 2, 3, 1, 3, 2, 1, 4, 2, 1, 2, 3, 1, 2, 4, 1, 3, 1,
-                2, 1, 3, 2, 1, 4, 1, 2, 3, 1,
-              ].map((w, idx) => (
-                <div
-                  key={idx}
-                  className="h-full bg-slate-900"
-                  style={{ width: `${w}px` }}
-                />
-              ))}
+            {/* Rincian Layanan Medis */}
+            <div className="space-y-1">
+              <div className="text-slate-400 text-[8.5px] font-bold uppercase tracking-wider">
+                Layanan Medis
+              </div>
+              <div className="font-bold text-slate-900 text-[10.5px]">
+                {service.title || "Layanan Medis"}
+              </div>
+              <div className="flex justify-between text-slate-600">
+                <span>Kategori</span>
+                <span className="uppercase font-semibold text-emerald-700">
+                  {service.category || "Umum"}
+                </span>
+              </div>
+
+              {/* Jadwal Dokter Jika Ada */}
+              {doctorInfo && (
+                <div className="my-1 rounded-sm bg-slate-50 p-1.5 border border-dashed border-slate-300 space-y-0.5 text-[8.5px]">
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-slate-500">Dokter :</span>
+                    <span className="font-bold text-slate-900 text-right truncate max-w-[140px]">
+                      {doctorInfo.doctor}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-slate-500">Spesialis :</span>
+                    <span className="text-slate-700 text-right">
+                      {doctorInfo.specialty}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-slate-500">Jadwal :</span>
+                    <span className="font-semibold text-emerald-800 text-right">
+                      {doctorInfo.schedule}
+                    </span>
+                  </div>
+                  <div className="flex items-start justify-between gap-1">
+                    <span className="text-slate-500">Ruangan :</span>
+                    <span className="text-slate-700 text-right">
+                      {doctorInfo.room}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between text-slate-700">
+                <span>Jadwal Kunjungan</span>
+                <span className="font-bold text-slate-900">
+                  {currentOrder.tanggal_kunjungan?.includes("T")
+                    ? currentOrder.tanggal_kunjungan.split("T")[0]
+                    : currentOrder.tanggal_kunjungan}{" "}
+                  {currentOrder.jam_kunjungan}
+                </span>
+              </div>
+
+              {currentOrder.keluhan && (
+                <div className="text-[8.5px] text-slate-500 italic truncate max-w-[250px]">
+                  Keluhan: &ldquo;{currentOrder.keluhan}&rdquo;
+                </div>
+              )}
             </div>
-            <div className="text-[9px] tracking-widest text-slate-500">
-              *{receiptCode}*
+
+            <div className="my-1.5 border-b border-dashed border-slate-300"></div>
+
+            {/* Rincian Tarif / Biaya Kasir */}
+            <div className="space-y-0.5 text-slate-700">
+              <div className="flex justify-between">
+                <span>1x {service.title || "Layanan"}</span>
+                <span>Rp {priceNumber.toLocaleString("id-ID")}</span>
+              </div>
+              <div className="flex justify-between text-[8.5px] text-slate-500">
+                <span>Biaya Loket / Registrasi</span>
+                <span>Rp 0 (GRATIS)</span>
+              </div>
+              <div className="flex justify-between text-[8.5px] text-slate-500">
+                <span>Pajak (PPN 0%)</span>
+                <span>Rp 0</span>
+              </div>
+
+              <div className="my-1 border-b-2 border-slate-800"></div>
+
+              <div className="flex justify-between text-[10.5px] font-black text-slate-900">
+                <span>TOTAL PEMBAYARAN</span>
+                <span>Rp {priceNumber.toLocaleString("id-ID")}</span>
+              </div>
+              <div className="flex justify-between text-[8.5px] text-slate-600">
+                <span>Metode Pembayaran</span>
+                <span>KASIR / TUNAI / QRIS</span>
+              </div>
+              <div className="flex justify-between text-[9px] font-bold mt-0.5">
+                <span>STATUS PESANAN</span>
+                <span
+                  className={
+                    currentOrder.status === "completed"
+                      ? "text-emerald-700"
+                      : currentOrder.status === "confirmed"
+                      ? "text-blue-700"
+                      : currentOrder.status === "cancelled"
+                      ? "text-rose-600"
+                      : "text-amber-700"
+                  }
+                >
+                  [ {getStatusBadge(currentOrder.status)} ]
+                </span>
+              </div>
             </div>
-          </div>
 
-          <div className="my-2 border-b border-dashed border-slate-300"></div>
+            <div className="my-2 border-b border-dashed border-slate-300"></div>
 
-          {/* Footer Struk */}
-          <div className="space-y-1 text-center text-[10px] text-slate-500">
-            <p className="font-bold text-slate-700">
-              *** TERIMA KASIH ATAS KUNJUNGAN ANDA ***
-            </p>
-            <p>Semoga Lekas Sembuh & Sehat Selalu</p>
-            <p className="text-[9px] text-slate-400">
-              Harap tunjukkan struk ini kepada petugas resepsionis/kasir saat
-              tiba di klinik.
-            </p>
+            {/* Barcode Kasir */}
+            <div className="text-center">
+              <div
+                className="mx-auto flex h-7 w-36 items-center justify-center gap-[1.5px] overflow-hidden py-0.5"
+                aria-hidden="true"
+              >
+                {[
+                  3, 1, 2, 1, 4, 1, 2, 3, 1, 3, 2, 1, 4, 2, 1, 2, 3, 1, 2, 4, 1, 3, 1,
+                  2, 1, 3, 2, 1, 4, 1, 2, 3, 1,
+                ].map((w, idx) => (
+                  <div
+                    key={idx}
+                    className="h-full bg-slate-900"
+                    style={{ width: `${Math.max(1, Math.round(w * 0.8))}px` }}
+                  />
+                ))}
+              </div>
+              <div className="text-[8px] tracking-widest text-slate-500 mt-0.5">
+                *{receiptCode}*
+              </div>
+            </div>
+
+            <div className="my-1.5 border-b border-dashed border-slate-300"></div>
+
+            {/* Footer Struk */}
+            <div className="space-y-0.5 text-center text-[8.5px] text-slate-500">
+              <p className="font-bold text-slate-700 text-[9px]">
+                *** TERIMA KASIH ATAS KUNJUNGAN ANDA ***
+              </p>
+              <p>Semoga Lekas Sembuh & Sehat Selalu</p>
+              <p className="text-[8px] text-slate-400">
+                Harap tunjukkan struk ini kepada petugas resepsionis/kasir saat
+                tiba di klinik.
+              </p>
+            </div>
           </div>
         </div>
       </div>
