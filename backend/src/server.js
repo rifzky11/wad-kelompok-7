@@ -1,14 +1,15 @@
+// ⚠️ dotenv HARUS dipanggil pertama kali sebelum module lain di-load
+// agar process.env sudah terisi saat Pool pg dibuat di db.js
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
 const { ensureDb } = require("./middleware/auth");
 const servicesRoutes = require("./routes/services");
 const patientsRoutes = require("./routes/patients");
 const usersRoutes = require("./routes/users");
 const authRoutes = require("./routes/auth");
 const appointmentsRoutes = require("./routes/appointments");
-
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;

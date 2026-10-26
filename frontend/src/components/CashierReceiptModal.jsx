@@ -20,6 +20,7 @@ function CashierReceiptModal({ order, onClose }) {
   const doctorInfo = getServiceDoctorSchedule(service);
 
   const formattedOrderId = `SEH-${String(order.id).padStart(5, "0")}`;
+  const receiptCode = order.kode_unik || formattedOrderId;
   const printDate = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     day: "numeric",
@@ -178,6 +179,10 @@ function CashierReceiptModal({ order, onClose }) {
               <span className="font-bold text-slate-900">#{formattedOrderId}</span>
             </div>
             <div className="flex justify-between">
+              <span>Kode Unik Struk</span>
+              <span className="font-bold text-slate-900">{receiptCode}</span>
+            </div>
+            <div className="flex justify-between">
               <span>Waktu Cetak</span>
               <span className="text-[10px] text-slate-500">{printDate}</span>
             </div>
@@ -261,7 +266,7 @@ function CashierReceiptModal({ order, onClose }) {
             <div className="flex justify-between text-slate-700">
               <span>Jadwal Kunjungan</span>
               <span className="font-bold text-slate-900">
-                {order.tanggal_kunjungan} {order.jam_kunjungan}
+                {order.tanggal_kunjungan?.includes("T") ? order.tanggal_kunjungan.split("T")[0] : order.tanggal_kunjungan} {order.jam_kunjungan}
               </span>
             </div>
 
@@ -328,7 +333,7 @@ function CashierReceiptModal({ order, onClose }) {
               ))}
             </div>
             <div className="text-[9px] tracking-widest text-slate-500">
-              *{formattedOrderId}*
+              *{receiptCode}*
             </div>
           </div>
 

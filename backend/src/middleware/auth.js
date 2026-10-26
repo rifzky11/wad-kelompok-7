@@ -1,15 +1,16 @@
-const { supabase } = require("../db");
+const { query } = require("../db");
 const { verifyToken } = require("../utils/auth");
 
-function ensureDb(req, res, next) {
-  if (!supabase) {
+async function ensureDb(req, res, next) {
+  try {
+    await query("SELECT 1");
+    next();
+  } catch (err) {
     return res.status(503).json({
       data: null,
-      message:
-        "Database belum dikonfigurasi. Pastikan SUPABASE_URL dan SUPABASE_ANON_KEY ada di .env.",
+      message: "Database belum dapat dijangkau. Pastikan DATABASE_URL sudah dikonfigurasi dengan benar di .env.",
     });
   }
-  next();
 }
 
 function normalizeRole(role) {
@@ -31,10 +32,10 @@ async function authenticate(req, res, next) {
     return res.status(401).json({ data: null, message: "Autentikasi diperlukan." });
   }
 
-  if (!supabase) {
+  if (!process.env.JWT_SECRET) {
     return res.status(503).json({
       data: null,
-      message: "Database auth belum dikonfigurasi. Tambahkan SUPABASE_ANON_KEY.",
+      message: "Auth belum dikonfigurasi. Tambahkan JWT_SECRET.",
     });
   }
 
@@ -47,19 +48,11 @@ async function authenticate(req, res, next) {
       });
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("users")
-      .select("id, email, nama_lengkap, role")
-      .eq("id", payload.sub)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("Failed to load user profile:", profileError.message);
-      return res.status(503).json({
-        data: null,
-        message: "Profil pengguna belum dapat dimuat.",
-      });
-    }
+    const result = await query(
+      "SELECT id, email, nama_lengkap, role FROM users WHERE id = $1",
+      [payload.sub]
+    );
+    const profile = result.rows[0];
 
     if (!profile) {
       return res.status(401).json({
@@ -99,7 +92,6 @@ function allowRoles(...roles) {
 }
 
 module.exports = {
-  supabase,
   ensureDb,
   normalizeRole,
   authenticate,
