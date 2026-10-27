@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../lib/api";
 import CashierReceiptModal from "../components/CashierReceiptModal";
+import {
+  formatPickupDeadline,
+  isMedicineOrder,
+  isMedicineOrderExpired,
+} from "../lib/medicineOrders";
 
 function Dashboard({ session, onLogout }) {
   const isAdmin = session?.role === "admin";
@@ -98,13 +103,14 @@ function Dashboard({ session, onLogout }) {
     }
   };
 
-  const isMedicineOrder = (order) => order?.services?.category === "obat";
-  const getOrderStatus = (order) =>
-    isMedicineOrder(order)
-      ? order.status === "completed"
-        ? "completed"
-        : "confirmed"
-      : order.status || "pending";
+  const getOrderStatus = (order) => {
+    if (isMedicineOrder(order)) {
+      if (order.status === "completed") return "completed";
+      if (isMedicineOrderExpired(order)) return "expired";
+      return "confirmed";
+    }
+    return order.status || "pending";
+  };
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -113,6 +119,7 @@ function Dashboard({ session, onLogout }) {
       case "confirmed":
         return "bg-blue-100 text-blue-800 border-blue-300";
       case "cancelled":
+      case "expired":
         return "bg-rose-100 text-rose-800 border-rose-300";
       default:
         return "bg-amber-100 text-amber-800 border-amber-300";
@@ -127,6 +134,8 @@ function Dashboard({ session, onLogout }) {
         return "Dikonfirmasi";
       case "cancelled":
         return "Dibatalkan";
+      case "expired":
+        return "Hangus";
       default:
         return "Menunggu";
     }
@@ -227,10 +236,10 @@ function Dashboard({ session, onLogout }) {
                 <div className="flex items-center gap-2">
                   <span
                     className={`rounded-full border px-3 py-1 text-xs font-bold uppercase tracking-wider ${getStatusBadgeClass(
-                      scannedReceiptOrder.status
+                      getOrderStatus(scannedReceiptOrder)
                     )}`}
                   >
-                    {getStatusLabel(scannedReceiptOrder.status)}
+                    {getStatusLabel(getOrderStatus(scannedReceiptOrder))}
                   </span>
                   <button
                     type="button"
@@ -274,13 +283,31 @@ function Dashboard({ session, onLogout }) {
                 </div>
 
                 <div className="rounded-lg bg-slate-50 p-2.5">
-                  <span className="block text-slate-400 font-medium mb-0.5">Jadwal & Keluhan</span>
-                  <p className="font-semibold text-slate-800">
-                    {scannedReceiptOrder.tanggal_kunjungan?.includes("T")
-                      ? scannedReceiptOrder.tanggal_kunjungan.split("T")[0]
-                      : scannedReceiptOrder.tanggal_kunjungan}{" "}
-                    {scannedReceiptOrder.jam_kunjungan}
-                  </p>
+                  <span className="block text-slate-400 font-medium mb-0.5">
+                    {isMedicineOrder(scannedReceiptOrder) ? "Pengambilan & Keluhan" : "Jadwal & Keluhan"}
+                  </span>
+                  {isMedicineOrder(scannedReceiptOrder) ? (
+                    <>
+                      <p className="font-semibold text-slate-800">Ambil kapan saja</p>
+                      <p
+                        className={`text-[11px] ${
+                          isMedicineOrderExpired(scannedReceiptOrder)
+                            ? "font-bold text-rose-600"
+                            : "text-slate-500"
+                        }`}
+                      >
+                        {isMedicineOrderExpired(scannedReceiptOrder) ? "Hangus sejak " : "Batas ambil "}
+                        {formatPickupDeadline(scannedReceiptOrder)}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="font-semibold text-slate-800">
+                      {scannedReceiptOrder.tanggal_kunjungan?.includes("T")
+                        ? scannedReceiptOrder.tanggal_kunjungan.split("T")[0]
+                        : scannedReceiptOrder.tanggal_kunjungan}{" "}
+                      {scannedReceiptOrder.jam_kunjungan}
+                    </p>
+                  )}
                   {scannedReceiptOrder.keluhan && (
                     <p className="text-slate-500 italic text-[11px] truncate">
                       &ldquo;{scannedReceiptOrder.keluhan}&rdquo;
@@ -300,7 +327,11 @@ function Dashboard({ session, onLogout }) {
               {/* Action Bar Admin untuk Selesaikan Pesanan */}
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  {scannedReceiptOrder.status !== "completed" ? (
+                  {getOrderStatus(scannedReceiptOrder) === "expired" ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-100 px-3 py-1.5 text-xs font-bold text-rose-700 border border-rose-200">
+                      <span>⛔</span> Pesanan hangus — stok tidak dikembalikan
+                    </span>
+                  ) : scannedReceiptOrder.status !== "completed" ? (
                     <button
                       type="button"
                       disabled={isUpdatingScanStatus}
@@ -316,26 +347,28 @@ function Dashboard({ session, onLogout }) {
                   )}
 
                   {/* Dropdown status pesanan */}
-                  <div className="flex items-center gap-1.5 text-xs text-slate-600">
-                    <span>Ubah status:</span>
-                    <select
-                      value={getOrderStatus(scannedReceiptOrder)}
-                      disabled={isUpdatingScanStatus}
-                      onChange={(e) =>
-                        handleScanStatusChange(scannedReceiptOrder.id, e.target.value)
-                      }
-                      className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none"
-                    >
-                      {!isMedicineOrder(scannedReceiptOrder) && (
-                        <option value="pending">Menunggu</option>
-                      )}
-                      <option value="confirmed">Dikonfirmasi</option>
-                      <option value="completed">Selesai</option>
-                      {!isMedicineOrder(scannedReceiptOrder) && (
-                        <option value="cancelled">Dibatalkan</option>
-                      )}
-                    </select>
-                  </div>
+                  {getOrderStatus(scannedReceiptOrder) !== "expired" && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <span>Ubah status:</span>
+                      <select
+                        value={getOrderStatus(scannedReceiptOrder)}
+                        disabled={isUpdatingScanStatus}
+                        onChange={(e) =>
+                          handleScanStatusChange(scannedReceiptOrder.id, e.target.value)
+                        }
+                        className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:outline-none"
+                      >
+                        {!isMedicineOrder(scannedReceiptOrder) && (
+                          <option value="pending">Menunggu</option>
+                        )}
+                        <option value="confirmed">Dikonfirmasi</option>
+                        <option value="completed">Selesai</option>
+                        {!isMedicineOrder(scannedReceiptOrder) && (
+                          <option value="cancelled">Dibatalkan</option>
+                        )}
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <button
@@ -401,34 +434,66 @@ function Dashboard({ session, onLogout }) {
                       {order.patients?.nama_lengkap || "-"}
                     </td>
                     <td className="px-3 py-3 text-slate-600">
-                      {order.tanggal_kunjungan?.includes("T")
-                        ? order.tanggal_kunjungan.split("T")[0]
-                        : order.tanggal_kunjungan}
-                      <span className="block text-xs text-slate-400">
-                        {order.jam_kunjungan}
-                      </span>
+                      {isMedicineOrder(order) ? (
+                        <>
+                          <span className="font-medium text-slate-700">Ambil kapan saja</span>
+                          <span
+                            className={`block text-xs ${
+                              isMedicineOrderExpired(order)
+                                ? "font-semibold text-rose-600"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {isMedicineOrderExpired(order) ? "Hangus sejak " : "Batas ambil "}
+                            {formatPickupDeadline(order)}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {order.tanggal_kunjungan?.includes("T")
+                            ? order.tanggal_kunjungan.split("T")[0]
+                            : order.tanggal_kunjungan}
+                          <span className="block text-xs text-slate-400">
+                            {order.jam_kunjungan}
+                          </span>
+                        </>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       {isAdmin ? (
-                        <select
-                          value={getOrderStatus(order)}
-                          onChange={(event) =>
-                            updateStatus(order.id, event.target.value)
-                          }
-                          className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold focus:border-emerald-500 focus:outline-none"
-                        >
-                          {!isMedicineOrder(order) && (
-                            <option value="pending">Menunggu</option>
-                          )}
-                          <option value="confirmed">Dikonfirmasi</option>
-                          <option value="completed">Selesai</option>
-                          {!isMedicineOrder(order) && (
-                            <option value="cancelled">Dibatalkan</option>
-                          )}
-                        </select>
+                        isMedicineOrder(order) && getOrderStatus(order) === "expired" ? (
+                          <span className="font-semibold text-rose-700" title="Melewati batas pengambilan 2 hari">
+                            Hangus
+                          </span>
+                        ) : (
+                          <select
+                            value={getOrderStatus(order)}
+                            onChange={(event) =>
+                              updateStatus(order.id, event.target.value)
+                            }
+                            className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-semibold focus:border-emerald-500 focus:outline-none"
+                          >
+                            {!isMedicineOrder(order) && (
+                              <option value="pending">Menunggu</option>
+                            )}
+                            <option value="confirmed">Dikonfirmasi</option>
+                            <option value="completed">Selesai</option>
+                            {!isMedicineOrder(order) && (
+                              <option value="cancelled">Dibatalkan</option>
+                            )}
+                          </select>
+                        )
                       ) : (
-                        <span className="font-semibold capitalize text-emerald-700">
-                          {getOrderStatus(order)}
+                        <span
+                          className={`font-semibold capitalize ${
+                            getOrderStatus(order) === "expired"
+                              ? "text-rose-700"
+                              : getOrderStatus(order) === "cancelled"
+                              ? "text-rose-600"
+                              : "text-emerald-700"
+                          }`}
+                        >
+                          {getStatusLabel(getOrderStatus(order))}
                         </span>
                       )}
                     </td>

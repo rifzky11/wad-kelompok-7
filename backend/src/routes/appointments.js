@@ -2,6 +2,11 @@ const express = require("express");
 const crypto = require("crypto");
 const { authenticate, allowRoles } = require("../middleware/auth");
 const { query } = require("../db");
+const {
+  MEDICINE_PICKUP_DAYS,
+  isMedicineCategory,
+  expireOverdueMedicineOrders,
+} = require("../utils/medicineOrders");
 
 const router = express.Router();
 
@@ -11,8 +16,8 @@ function createReceiptCode() {
 
 router.post("/api/appointments", authenticate, allowRoles("patient"), async (req, res) => {
   const { service_id, tanggal_kunjungan, jam_kunjungan, keluhan } = req.body;
-  if (!service_id || !tanggal_kunjungan || !jam_kunjungan) {
-    return res.status(400).json({ data: null, message: "Layanan, tanggal, dan jam kunjungan wajib diisi." });
+  if (!service_id) {
+    return res.status(400).json({ data: null, message: "Layanan wajib dipilih." });
   }
 
   try {
@@ -41,14 +46,31 @@ router.post("/api/appointments", authenticate, allowRoles("patient"), async (req
 
     const kode_unik = createReceiptCode();
     const status = service.category === "obat" ? "confirmed" : "pending";
+    const isMedicine = isMedicineCategory(service.category);
+
+    // Pesanan obat bisa diambil kapan saja, sehingga tanggal & jam kunjungan
+    // tidak wajib. Untuk layanan lain, keduanya tetap wajib diisi.
+    if (!isMedicine && (!tanggal_kunjungan || !jam_kunjungan)) {
+      return res.status(400).json({ data: null, message: "Layanan, tanggal, dan jam kunjungan wajib diisi." });
+    }
 
     // Buat appointment
-    const apptResult = await query(
-      `INSERT INTO appointments (patient_id, service_id, kode_unik, tanggal_kunjungan, jam_kunjungan, keluhan, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING *`,
-      [patient.id, service_id, kode_unik, tanggal_kunjungan, jam_kunjungan, keluhan || null, status]
-    );
+    // - Obat: tanggal/jam diisi waktu pemesanan (tanpa jadwal kunjungan) dan
+    //   diberi batas pengambilan 2 hari. Status langsung "confirmed".
+    // - Layanan lain: memakai tanggal & jam kunjungan yang dipilih pasien.
+    const apptResult = isMedicine
+      ? await query(
+          `INSERT INTO appointments (patient_id, service_id, kode_unik, tanggal_kunjungan, jam_kunjungan, keluhan, status, batas_pengambilan)
+           VALUES ($1, $2, $3, CURRENT_DATE, CURRENT_TIME, $4, $5, NOW() + ($6::int * INTERVAL '1 day'))
+           RETURNING *`,
+          [patient.id, service_id, kode_unik, keluhan || null, status, MEDICINE_PICKUP_DAYS]
+        )
+      : await query(
+          `INSERT INTO appointments (patient_id, service_id, kode_unik, tanggal_kunjungan, jam_kunjungan, keluhan, status)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING *`,
+          [patient.id, service_id, kode_unik, tanggal_kunjungan, jam_kunjungan, keluhan || null, status]
+        );
     const appointment = apptResult.rows[0];
 
     // Update kuota secara atomik (optimistic lock)
@@ -87,7 +109,12 @@ router.post("/api/appointments", authenticate, allowRoles("patient"), async (req
       },
     };
 
-    res.status(201).json({ data: enriched, message: "Pesanan berhasil dibuat." });
+    res.status(201).json({
+      data: enriched,
+      message: isMedicine
+        ? `Pesanan obat berhasil dibuat. Ambil paling lambat ${MEDICINE_PICKUP_DAYS} hari sejak pemesanan; jika tidak diambil, pesanan hangus dan stok tidak dikembalikan.`
+        : "Pesanan berhasil dibuat.",
+    });
   } catch (err) {
     console.error("Create appointment error:", err.message);
     res.status(500).json({ data: null, message: err.message });
@@ -101,6 +128,8 @@ router.get("/api/appointments/receipt/:code", authenticate, allowRoles("admin"),
   }
 
   try {
+    await expireOverdueMedicineOrders();
+
     const receiptSql = `
       SELECT a.*,
              p.id AS "patient_id_ref", p.no_rm, p.nama_lengkap AS "patient_nama", p.no_telp,
@@ -149,6 +178,8 @@ router.get("/api/appointments", authenticate, async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
+    await expireOverdueMedicineOrders();
+
     let whereClauses = [];
     let params = [];
 
@@ -212,9 +243,12 @@ router.patch("/api/appointments/:id/status", authenticate, allowRoles("admin"), 
   }
 
   try {
+    // Perbarui dulu status pesanan obat yang sudah melewati batas pengambilan.
+    await expireOverdueMedicineOrders();
+
     // Cek apakah pesanan ada dan ambil kategori service
     const currentResult = await query(
-      `SELECT a.id, s.category AS service_category
+      `SELECT a.id, a.status, a.batas_pengambilan, s.category AS service_category
        FROM appointments a
        LEFT JOIN services s ON a.service_id = s.id
        WHERE a.id = $1`,
@@ -225,6 +259,23 @@ router.patch("/api/appointments/:id/status", authenticate, allowRoles("admin"), 
     }
 
     const current = currentResult.rows[0];
+    const batasPengambilan = current.batas_pengambilan
+      ? new Date(current.batas_pengambilan).getTime()
+      : null;
+    const isOverdue =
+      current.service_category === "obat" &&
+      ["pending", "confirmed"].includes(current.status) &&
+      batasPengambilan !== null &&
+      batasPengambilan <= Date.now();
+
+    if (current.status === "expired" || isOverdue) {
+      return res.status(409).json({
+        data: null,
+        code: "MEDICINE_ORDER_EXPIRED",
+        message: "Pesanan obat sudah hangus karena melewati batas pengambilan 2 hari. Stok tidak dikembalikan.",
+      });
+    }
+
     if (current.service_category === "obat" && ["pending", "cancelled"].includes(req.body.status)) {
       return res.status(400).json({ data: null, message: "Pesanan obat hanya dapat berstatus dikonfirmasi atau selesai." });
     }
