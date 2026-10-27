@@ -4,7 +4,9 @@
   "description": "",
   "main": "src/server.js",
   "scripts": {
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "db:check": "node src/checkDb.js",
+    "db:setup": "node src/setupDb.js"
   },
   "keywords": [],
   "author": "kelompok-8",

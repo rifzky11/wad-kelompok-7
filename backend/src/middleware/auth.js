@@ -1,4 +1,4 @@
-const { query } = require("../db");
+const { query, describeDatabaseTarget, explainDatabaseError } = require("../db");
 const { verifyToken } = require("../utils/auth");
 
 async function ensureDb(req, res, next) {
@@ -6,8 +6,16 @@ async function ensureDb(req, res, next) {
     await query("SELECT 1");
     next();
   } catch (err) {
+    console.error(
+      `❌ Koneksi database gagal (${req.method} ${req.originalUrl})`,
+      `\n   target  : ${describeDatabaseTarget()}`,
+      `\n   kode    : ${err.code || "-"}`,
+      `\n   pesan   : ${err.message}`,
+      `\n   saran   : ${explainDatabaseError(err)}`
+    );
     return res.status(503).json({
       data: null,
+      code: "DATABASE_UNAVAILABLE",
       message: "Database belum dapat dijangkau. Pastikan DATABASE_URL sudah dikonfigurasi dengan benar di .env.",
     });
   }

@@ -3,6 +3,13 @@ import { apiRequest } from "../lib/api";
 import { getServiceDoctorSchedule } from "../data/doctors";
 import CashierReceiptModal from "../components/CashierReceiptModal";
 import OrderStatusModal from "../components/OrderStatusModal";
+import {
+  MEDICINE_PICKUP_DAYS,
+  formatDateTimeId,
+  getEstimatedPickupDeadline,
+  getPickupDeadline,
+  isMedicineCategory,
+} from "../lib/medicineOrders";
 
 function LayananMedis({ session, navigate }) {
   const isAdmin = session?.role === "admin";
@@ -27,6 +34,9 @@ function LayananMedis({ session, navigate }) {
     tanggal_lahir: "", no_telp: "", alamat: "",
   });
   const [orderForm, setOrderForm] = useState({ tanggal_kunjungan: "", jam_kunjungan: "", keluhan: "" });
+
+  // Pesanan obat tidak memerlukan tanggal/jam kunjungan.
+  const isSelectedServiceMedicine = isMedicineCategory(selectedService?.category);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -274,15 +284,26 @@ function LayananMedis({ session, navigate }) {
     setFormError("");
     setIsActionLoading(true);
     try {
+      const isMedicine = isMedicineCategory(selectedService?.category);
+      const payload = { service_id: selectedService.id, keluhan: orderForm.keluhan };
+      if (!isMedicine) {
+        payload.tanggal_kunjungan = orderForm.tanggal_kunjungan;
+        payload.jam_kunjungan = orderForm.jam_kunjungan;
+      }
+
       const result = await apiRequest("/api/appointments", {
         method: "POST",
-        body: JSON.stringify({ service_id: selectedService.id, ...orderForm }),
+        body: JSON.stringify(payload),
       });
       setIsOrderFormOpen(false);
       closeServiceDetail();
       setOrderStatus({
         type: "success",
-        message: "Layanan berhasil dipesan. Silakan simpan struk untuk ditunjukkan saat kunjungan.",
+        message: isMedicine
+          ? `Pesanan obat berhasil dibuat. Ambil kapan saja paling lambat ${formatDateTimeId(
+              getPickupDeadline(result.data)
+            )}. Jika tidak diambil, pesanan hangus dan stok obat tidak dikembalikan.`
+          : "Layanan berhasil dipesan. Silakan simpan struk untuk ditunjukkan saat kunjungan.",
         order: result.data,
       });
       fetchServices();
@@ -838,7 +859,9 @@ function LayananMedis({ session, navigate }) {
                 )}
 
                 <p className="mt-6 rounded-xl bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                  Pilih layanan ini untuk mengajukan pesanan kepada admin.
+                  {isSelectedServiceMedicine
+                    ? "Pesan obat ini tanpa memilih tanggal kunjungan. Tunjukkan struk saat mengambil di kasir/apotek."
+                    : "Pilih layanan ini untuk mengajukan pesanan kepada admin."}
                 </p>
                 {!isAdmin && (
                   <button
@@ -847,9 +870,18 @@ function LayananMedis({ session, navigate }) {
                     disabled={isActionLoading || selectedService.kuota < 1}
                     className="mt-4 w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {isActionLoading ? "Memeriksa data..." : selectedService.kuota < 1 ? "Kuota habis" : "Pilih Pesanan Ini"}
+                    {isActionLoading
+                      ? "Memeriksa data..."
+                      : selectedService.kuota < 1
+                      ? isSelectedServiceMedicine
+                        ? "Stok habis"
+                        : "Kuota habis"
+                      : isSelectedServiceMedicine
+                      ? "Pesan Obat"
+                      : "Pilih Pesanan Ini"}
                   </button>
                 )}
+
                 {formError && (
                   <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</p>
                 )}
@@ -895,22 +927,40 @@ function LayananMedis({ session, navigate }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
           <form onSubmit={placeOrder} className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-slate-900">Pesan {selectedService.title}</h2>
-            {(() => {
-              const doctorInfo = getServiceDoctorSchedule(selectedService);
-              if (!doctorInfo) return null;
-              return (
-                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
-                  <div className="flex items-center gap-1.5 font-bold">
-                    <span>{doctorInfo.icon}</span>
-                    <span>Dokter: {doctorInfo.doctor}</span>
+
+            {isSelectedServiceMedicine ? (
+              <div className="mt-4 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+                <p className="font-bold">Tanpa tanggal kunjungan — ambil kapan saja</p>
+                <p className="mt-1 leading-5">
+                  Pesanan obat dapat diambil kapan saja di kasir/apotek. Batas pengambilan maksimal{" "}
+                  <strong>{MEDICINE_PICKUP_DAYS} hari</strong> sejak pemesanan, yaitu sampai{" "}
+                  <strong>{formatDateTimeId(getEstimatedPickupDeadline())}</strong>. Jika tidak
+                  diambil, pesanan hangus dan stok obat tidak dikembalikan.
+                </p>
+              </div>
+            ) : (
+              (() => {
+                const doctorInfo = getServiceDoctorSchedule(selectedService);
+                if (!doctorInfo) return null;
+                return (
+                  <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/80 p-3 text-xs text-emerald-900">
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span>{doctorInfo.icon}</span>
+                      <span>Dokter: {doctorInfo.doctor}</span>
+                    </div>
+                    <p className="mt-1 font-medium">🕒 Jadwal: {doctorInfo.schedule}</p>
+                    <p className="mt-0.5 text-[11px] text-emerald-700">Pilih tanggal & jam sesuai jam operasional dokter di atas.</p>
                   </div>
-                  <p className="mt-1 font-medium">🕒 Jadwal: {doctorInfo.schedule}</p>
-                  <p className="mt-0.5 text-[11px] text-emerald-700">Pilih tanggal & jam sesuai jam operasional dokter di atas.</p>
-                </div>
-              );
-            })()}
-            <label className="mt-5 block text-sm font-medium text-slate-700">Tanggal kunjungan<input required min={new Date().toISOString().slice(0, 10)} type="date" value={orderForm.tanggal_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, tanggal_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
-            <label className="mt-4 block text-sm font-medium text-slate-700">Jam kunjungan<input required type="time" value={orderForm.jam_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, jam_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+                );
+              })()
+            )}
+
+            {!isSelectedServiceMedicine && (
+              <>
+                <label className="mt-5 block text-sm font-medium text-slate-700">Tanggal kunjungan<input required min={new Date().toISOString().slice(0, 10)} type="date" value={orderForm.tanggal_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, tanggal_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+                <label className="mt-4 block text-sm font-medium text-slate-700">Jam kunjungan<input required type="time" value={orderForm.jam_kunjungan} onChange={(e) => setOrderForm({ ...orderForm, jam_kunjungan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" /></label>
+              </>
+            )}
             <label className="mt-4 block text-sm font-medium text-slate-700">Keluhan (opsional)<textarea value={orderForm.keluhan} onChange={(e) => setOrderForm({ ...orderForm, keluhan: e.target.value })} className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2" rows="3" /></label>
             {formError && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
             <div className="mt-5 flex justify-end gap-3"><button type="button" onClick={() => setIsOrderFormOpen(false)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Batal</button><button disabled={isActionLoading} className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{isActionLoading ? "Mengirim..." : "Kirim Pesanan"}</button></div>

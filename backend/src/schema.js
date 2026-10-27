@@ -90,12 +90,39 @@ WHERE kode_unik IS NOT NULL;
 ALTER TABLE public.appointments
 ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'pending';
 
+-- Batas pengambilan khusus pesanan obat (maksimal 2 hari sejak pemesanan).
+ALTER TABLE public.appointments
+ADD COLUMN IF NOT EXISTS batas_pengambilan TIMESTAMPTZ;
+
+UPDATE public.appointments AS a
+SET batas_pengambilan = a.created_at + INTERVAL '2 days'
+FROM public.services AS s
+WHERE a.service_id = s.id
+  AND s.category = 'obat'
+  AND a.batas_pengambilan IS NULL;
+
+CREATE INDEX IF NOT EXISTS appointments_batas_pengambilan_idx
+ON public.appointments(batas_pengambilan)
+WHERE batas_pengambilan IS NOT NULL;
+
 UPDATE public.appointments AS a
 SET status = 'confirmed'
 FROM public.services AS s
 WHERE a.service_id = s.id
   AND s.category = 'obat'
   AND a.status IN ('pending', 'cancelled');
+
+-- Pesanan obat yang melewati batas pengambilan ditandai hangus ("expired").
+-- Stok sengaja TIDAK dikembalikan sesuai aturan pesanan obat.
+UPDATE public.appointments AS a
+SET status = 'expired'
+FROM public.services AS s
+WHERE a.service_id = s.id
+  AND s.category = 'obat'
+  AND a.status IN ('pending', 'confirmed')
+  AND a.batas_pengambilan IS NOT NULL
+  AND a.batas_pengambilan <= NOW();
+
 
 -- Medical records
 CREATE TABLE IF NOT EXISTS medical_records (

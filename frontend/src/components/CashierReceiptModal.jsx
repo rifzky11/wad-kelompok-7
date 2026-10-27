@@ -1,6 +1,12 @@
 import { toPng } from "html-to-image";
 import { useEffect, useState } from "react";
 import { getServiceDoctorSchedule } from "../data/doctors";
+import {
+  MEDICINE_PICKUP_DAYS,
+  formatPickupDeadline,
+  isMedicineOrder,
+  isMedicineOrderExpired,
+} from "../lib/medicineOrders";
 
 function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }) {
   const [currentOrder, setCurrentOrder] = useState(order);
@@ -24,6 +30,9 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
   const service = currentOrder.services || {};
   const patient = currentOrder.patients || {};
   const doctorInfo = getServiceDoctorSchedule(service);
+  const isMedicine = isMedicineOrder(currentOrder);
+  const isExpired = isMedicineOrderExpired(currentOrder);
+  const displayStatus = isExpired ? "expired" : currentOrder.status;
 
   const formattedOrderId = `SEH-${String(currentOrder.id).padStart(5, "0")}`;
   const receiptCode = currentOrder.kode_unik || formattedOrderId;
@@ -46,6 +55,8 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
         return "SELESAI (LUNAS)";
       case "cancelled":
         return "DIBATALKAN";
+      case "expired":
+        return "HANGUS (TIDAK DIAMBIL)";
       default:
         return "MENUNGGU KONFIRMASI";
     }
@@ -167,32 +178,38 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
 
             {/* Quick Status Action for Admin */}
             {isAdmin && onUpdateStatus && (
-              <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px]">
-                {currentOrder.status === "completed" ? (
-                  <div className="flex w-full items-center justify-between">
-                    <span className="font-bold text-emerald-800 flex items-center gap-1 text-[11px]">
-                      <span>✓</span> Status: Selesai
-                    </span>
+              isExpired ? (
+                <div className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[11px] font-bold text-rose-700">
+                  <span>⛔</span> Pesanan hangus — stok tidak dikembalikan
+                </div>
+              ) : (
+                <div className="flex w-full items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-[11px]">
+                  {currentOrder.status === "completed" ? (
+                    <div className="flex w-full items-center justify-between">
+                      <span className="font-bold text-emerald-800 flex items-center gap-1 text-[11px]">
+                        <span>✓</span> Status: Selesai
+                      </span>
+                      <button
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleSetStatus("confirmed")}
+                        className="text-[10px] text-slate-500 underline hover:text-slate-800"
+                      >
+                        Batal Selesai
+                      </button>
+                    </div>
+                  ) : (
                     <button
                       type="button"
                       disabled={isUpdatingStatus}
-                      onClick={() => handleSetStatus("confirmed")}
-                      className="text-[10px] text-slate-500 underline hover:text-slate-800"
+                      onClick={() => handleSetStatus("completed")}
+                      className="flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 py-1 font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
                     >
-                      Batal Selesai
+                      <span>✅</span> {isUpdatingStatus ? "Menyimpan..." : "Selesaikan Pesanan"}
                     </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={isUpdatingStatus}
-                    onClick={() => handleSetStatus("completed")}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-md bg-emerald-600 py-1 font-bold text-white shadow-xs transition hover:bg-emerald-700 active:scale-95 disabled:opacity-60"
-                  >
-                    <span>✅</span> {isUpdatingStatus ? "Menyimpan..." : "Selesaikan Pesanan"}
-                  </button>
-                )}
-              </div>
+                  )}
+                </div>
+              )
             )}
           </div>
 
@@ -224,7 +241,7 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
 
             {/* Judul & Info Transaksi */}
             <div className="text-center font-bold tracking-wider text-slate-900 text-[9.5px]">
-              STRUK RESERVASI LAYANAN
+              {isMedicine ? "STRUK PESANAN OBAT" : "STRUK RESERVASI LAYANAN"}
             </div>
             <div className="my-1 border-b border-dashed border-slate-200"></div>
 
@@ -318,15 +335,34 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
                 </div>
               )}
 
-              <div className="flex justify-between text-slate-700">
-                <span>Jadwal Kunjungan</span>
-                <span className="font-bold text-slate-900">
-                  {currentOrder.tanggal_kunjungan?.includes("T")
-                    ? currentOrder.tanggal_kunjungan.split("T")[0]
-                    : currentOrder.tanggal_kunjungan}{" "}
-                  {currentOrder.jam_kunjungan}
-                </span>
-              </div>
+              {isMedicine ? (
+                <>
+                  <div className="flex justify-between text-slate-700">
+                    <span>Pengambilan</span>
+                    <span className="font-bold text-slate-900">Kapan saja</span>
+                  </div>
+                  <div className="flex justify-between text-slate-700">
+                    <span>Batas Ambil</span>
+                    <span className={`font-bold ${isExpired ? "text-rose-600" : "text-slate-900"}`}>
+                      {formatPickupDeadline(currentOrder)}
+                    </span>
+                  </div>
+                  <p className="text-[8px] italic leading-tight text-slate-500">
+                    Maksimal {MEDICINE_PICKUP_DAYS} hari sejak pemesanan. Jika tidak diambil,
+                    pesanan hangus dan stok obat tidak dikembalikan.
+                  </p>
+                </>
+              ) : (
+                <div className="flex justify-between text-slate-700">
+                  <span>Jadwal Kunjungan</span>
+                  <span className="font-bold text-slate-900">
+                    {currentOrder.tanggal_kunjungan?.includes("T")
+                      ? currentOrder.tanggal_kunjungan.split("T")[0]
+                      : currentOrder.tanggal_kunjungan}{" "}
+                    {currentOrder.jam_kunjungan}
+                  </span>
+                </div>
+              )}
 
               {currentOrder.keluhan && (
                 <div className="text-[8.5px] text-slate-500 italic truncate max-w-[250px]">
@@ -366,16 +402,16 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
                 <span>STATUS PESANAN</span>
                 <span
                   className={
-                    currentOrder.status === "completed"
+                    displayStatus === "completed"
                       ? "text-emerald-700"
-                      : currentOrder.status === "confirmed"
+                      : displayStatus === "confirmed"
                       ? "text-blue-700"
-                      : currentOrder.status === "cancelled"
+                      : displayStatus === "cancelled" || displayStatus === "expired"
                       ? "text-rose-600"
                       : "text-amber-700"
                   }
                 >
-                  [ {getStatusBadge(currentOrder.status)} ]
+                  [ {getStatusBadge(displayStatus)} ]
                 </span>
               </div>
             </div>
@@ -409,12 +445,15 @@ function CashierReceiptModal({ order, onClose, onUpdateStatus, isAdmin = false }
             {/* Footer Struk */}
             <div className="space-y-0.5 text-center text-[8.5px] text-slate-500">
               <p className="font-bold text-slate-700 text-[9px]">
-                *** TERIMA KASIH ATAS KUNJUNGAN ANDA ***
+                {isMedicine
+                  ? "*** TERIMA KASIH ATAS PESANAN ANDA ***"
+                  : "*** TERIMA KASIH ATAS KUNJUNGAN ANDA ***"}
               </p>
               <p>Semoga Lekas Sembuh & Sehat Selalu</p>
               <p className="text-[8px] text-slate-400">
-                Harap tunjukkan struk ini kepada petugas resepsionis/kasir saat
-                tiba di klinik.
+                {isMedicine
+                  ? "Harap tunjukkan struk ini kepada petugas apotek/kasir saat mengambil obat."
+                  : "Harap tunjukkan struk ini kepada petugas resepsionis/kasir saat tiba di klinik."}
               </p>
             </div>
           </div>
